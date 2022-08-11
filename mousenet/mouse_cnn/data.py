@@ -3,7 +3,9 @@ import os
 import csv
 import numpy as np
 from scipy.optimize import curve_fit
-
+import pathlib
+import pdb
+import pandas as pd
 """
 Interface to mouse data sources.
 """
@@ -159,10 +161,14 @@ class Data:
         # bars in Figure 9C,D of ﻿J. Zhuang et al., “An extended retinotopic map of mouse cortex,”
         # Elife, p. e18372, 2017. In fact different areas have different visual field shapes and
         # offsets, but we defer this aspect to future models.
+        area = "".join([i for i in area if not i.isdigit() and i != "/"])
+        area = area.lower()
+        if area == "lgnd":
+            return 0, 0, 64, 64
         project_root = pathlib.Path(__file__).parent.parent.resolve()
         df = pd.read_csv(os.path.join(project_root, "retinotopics", "retinomap.csv"))
         df["name"] = df["name"].apply(lambda x: x.lower())
-        return df[df["name"] == area.lower()]["x1", "y1", "x2", "y2"]
+        return df[df["name"] == area][["x1", "y1", "x2", "y2"]].values.tolist()[0]
 
     def get_visual_field(self, area):
         """

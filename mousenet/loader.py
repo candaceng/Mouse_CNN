@@ -10,10 +10,11 @@ from .cmouse import network
 import pathlib
 import os, pdb
 
-def generate_net(retinotopic=False):
+def generate_net(retinotopic=False, force=False):
     root = pathlib.Path(__file__).parent.resolve()
     cached = os.path.join(root, "data_files", f"net_cache_{'retino' if retinotopic else ''}.pkl")
-    if os.path.isfile(cached):
+    if (not force) and os.path.isfile(cached):
+        pdb.set_trace()
         return network.load_network_from_pickle(cached)
     architecture = Architecture()
     anet = gen_anatomy(architecture)
@@ -22,7 +23,7 @@ def generate_net(retinotopic=False):
     network.save_network_to_pickle(net, cached)
     return net
 
-def load(architecture, pretraining=None):
+def load(architecture, pretraining=None, force=False):
     if architecture not in ("default", "retinotopic"):
         raise ValueError("Architecture must be one of default or retinotopic")  
     
@@ -35,12 +36,10 @@ def load(architecture, pretraining=None):
     #     net = pickle.load(file)
     #     pdb.set_trace()
 
-    net = generate_net(retinotopic= architecture=="retinotopic")
-    mousenet = MouseNetCompletePool(net)
-        
-    retinomap = None
-    
-    model = MouseNetCompletePool(net, retinomap = retinomap)
+    net = generate_net(architecture == "retinotopic", force)
+    # mousenet = MouseNetCompletePool(net)
+
+    model = MouseNetCompletePool(net)
     
 
     if pretraining == "kaiming" or None:

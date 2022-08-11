@@ -9,6 +9,8 @@ import pickle
 import matplotlib.pyplot as plt
 import pathlib
 import pdb
+import pandas as pd
+
 class ConvParam:
     def __init__(self, in_channels, out_channels, gsh, gsw, out_sigma):
         """
@@ -112,7 +114,7 @@ class Network:
             out_anat_layer = anet.find_layer(e[1].area, e[1].depth)
             
             if self.retinotopic:
-                out_sigma = np.sqrt(self.calculate_pixel_area_source_target_ratio(in_layer_name, out_layer_name))
+                out_sigma = np.sqrt(self.calculate_pixel_area_source_target_ratio(architecture, in_layer_name, out_layer_name))
             else:
                 out_sigma = get_out_sigma(e[0].area, e[0].depth, e[1].area, e[1].depth)
             out_size = in_size * out_sigma
@@ -161,11 +163,17 @@ class Network:
         plt.show()
 
     def calculate_pixel_area_with_visual_field(self, architecture, area):
+        """
+        Calculates the area (in pixels) of an area for a given architecture
+        """
         x1, y1, x2, y2 = architecture.get_visual_field_shape(area)
         area = (x2 - x1)*(y2 - y1)
         return area
 
     def calculate_pixel_area_source_target_ratio(self, architecture, source_area, target_area):
+        """
+        Calculates the ratio of source to target areas, in pixel space
+        """
         in_layer_pixel_area = self.calculate_pixel_area_with_visual_field(architecture, source_area)
         out_layer_pixel_area = self.calculate_pixel_area_with_visual_field(architecture, target_area)
         return out_layer_pixel_area/in_layer_pixel_area

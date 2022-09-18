@@ -28,6 +28,7 @@ dependencies:
   - absl-py
   - future
   - tqdm
+  - pycma
   - pip
   - pip:
     - -e .  # install package in development mode

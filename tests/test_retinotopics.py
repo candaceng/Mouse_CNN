@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 import pdb
 import pytest
+import numpy as np
 
 @pytest.fixture(scope="session")
 def model(architecture="retinotopic", force=False):
@@ -16,12 +17,12 @@ def test_retinotopics_runs(model):
     print(f"results shape is {results.shape}")
     return True
 
-def test_retinotopics_loads_in_gpu(model):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    input = torch.rand(1, 3, 64, 64).to(device)
-    results = model(input)
-    print(results.shape)
+# def test_retinotopics_loads_in_gpu(model):
+#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#     model.to(device)
+#     input = torch.rand(1, 3, 64, 64).to(device)
+#     results = model(input)
+#     print(results.shape)
 
 def test_num_channels(model):
     pdb.set_trace()
@@ -29,19 +30,19 @@ def test_num_channels(model):
     assert model.Convs["VISp2/3VISp5"].in_channels == 42
 
     #Visli4 -> Vispor4. Stock is 5
-    assert model.Convs["VISli4VISpor4"].in_channels == 40
+    assert model.Convs["VISli4VISpor4"].in_channels == 8
     
     #VISpor2/3 -> VISpor5. Stock 29
-    assert model.Convs["VISpor2/3VISpor5"].in_channels == 609
+    assert model.Convs["VISpor2/3VISpor5"].in_channels == 159
 
 def test_kernel_sizes(model):
-    #Visp2/3 -> Visp5. Stock is (3, 3)
+    # Visp2/3 -> Visp5. Stock is (3, 3)
     assert model.Convs["VISp2/3VISp5"].kernel_size == (3, 3)
 
-    #Visli4 -> Vispor4. Stock is (15, 15). sigma factor = 0.71
-    assert model.Convs["VISli4VISpor4"].kernel_size == (9, 9)
+    # Visli4 -> Vispor4. Stock is (15, 15)
+    assert model.Convs["VISli4VISpor4"].kernel_size == (15, 15)
     
-    #VISpor2/3 -> VISpor5. Stock is (3, 3). sigma factor = 0.43
+    #VISpor2/3 -> VISpor5. Stock is (1, 1)
     assert model.Convs["VISpor2/3VISpor5"].kernel_size == (1, 1)
 
 def test_kernel_stride(model):
@@ -54,12 +55,16 @@ def test_kernel_stride(model):
     #VISpor2/3 -> VISpor5. Stock is (1, 1)
     assert model.Convs["VISpor2/3VISpor5"].stride == (1, 1)
 
+# TODO: Need to verify this once subfield is implemented
+# out_sigma: ratio between output size and input size, 1/2 means reduce output size to 1/2 of the input size
+# KmS = int((self.kernel_size-1/out_sigma))
+# padding = int(KmS/2) or padding = (int(KmS/2), int(KmS/2+1), int(KmS/2), int(KmS/2+1))
 def test_kernel_padding(model):
     #Visp2/3 -> Visp5. Stock is (1,1,1,1)
     assert model.Convs["VISp2/3VISp5"].mypadding.padding == (1,1,1,1)
 
     #Visli4 -> Vispor4. Stock is (8,8,8,8)
-    assert model.Convs["VISli4VISpor4"].mypadding.padding == (4,4,4,4)
+    assert model.Convs["VISli4VISpor4"].mypadding.padding == (6,7,6,7)
     
     #VISpor2/3 -> VISpor5. Stock is (1,1,1,1)
     assert model.Convs["VISpor2/3VISpor5"].mypadding.padding == (0,0,0,0)
@@ -67,17 +72,17 @@ def test_kernel_padding(model):
 def test_gaussian_height_and_width():
     params_df = extract_params(retinotopic=True, force=False)
 
-    #Visp2/3 -> Visp5. Stock is 0.167338 and 1.868241
-    assert params_df.iloc[9].gsh == 0.167338
-    assert params_df.iloc[9].gsw == 1.868241
+    #Visp2/3 -> Visp5. Stock is 0.167338 and 1.8615418573925362
+    assert np.isclose(params_df.iloc[9].gsh, 0.167338, rtol=1e-5)
+    assert np.isclose(params_df.iloc[9].gsw , 1.8682405341867725, rtol=1e-5)
 
     #Visli4 -> Vispor4. Stock is 0.017436 and 8.978710
-    assert params_df.iloc[21].gsh == 0.1237956
-    assert params_df.iloc[21].gsw == 6.3748841
+    assert np.isclose(params_df.iloc[21].gsh , 0.1237956, rtol=1e-6)
+    assert np.isclose(params_df.iloc[21].gsw , 6.3748841, rtol=1e-6)
     
     #VISpor2/3 -> VISpor5. Stock is 0.167338 and 1.741991
-    assert params_df.iloc[43].gsh == 0.07195534
-    assert params_df.iloc[43].gsw == 0.74905613
+    assert np.isclose(params_df.iloc[43].gsh , 0.07195534, rtol=1e-7)
+    assert np.isclose(params_df.iloc[43].gsw , 0.74905613, rtol=1e-7)
 
 def extract_params(retinotopic=False, force=False):
     """
@@ -91,6 +96,7 @@ def extract_params(retinotopic=False, force=False):
     df_params = pd.DataFrame([l.params.__dict__ for l in net.layers])
     
     df = pd.concat([df_st, df_params], axis=1)
+
     return df
 
 if __name__ == "__main__":

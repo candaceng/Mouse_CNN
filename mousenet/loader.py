@@ -1,12 +1,12 @@
 from doctest import REPORTING_FLAGS
 import pickle
 import os
-from .cmouse.mousenet_complete_pool import MouseNetCompletePool
+from mousenet.cmouse.mousenet_complete_pool import MouseNetCompletePool
 import torch.nn as nn
 import pathlib
-from .cmouse.anatomy import gen_anatomy
-from .mouse_cnn.architecture import Architecture
-from .cmouse import network
+from mousenet.cmouse.anatomy import gen_anatomy
+from mousenet.mouse_cnn.architecture import Architecture
+from mousenet.cmouse import network
 import pathlib
 import os, pdb
 

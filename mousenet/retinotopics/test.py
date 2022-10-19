@@ -12,7 +12,7 @@ def test_load_results():
 
 
 def test_normalized_polygon_coordinates():
-	 with open("retinomap.pkl", "rb") as file:
+	with open("retinomap.pkl", "rb") as file:
 		results = pickle.load(file)
 
 	for area in results:

@@ -1,8 +1,8 @@
 import numpy as np
 
-from example.config import EDGE_Z
-from mouse_cnn.data import Data
-from mouse_cnn.voxel import Target, get_surface_area_mm2
+from mousenet.example.config import EDGE_Z
+from mousenet.mouse_cnn.data import Data
+from mousenet.mouse_cnn.voxel import Target, get_surface_area_mm2
 
 # TODO: review hard-coded values for LGN
 

@@ -3,7 +3,9 @@ import torch
 import pandas as pd
 import pdb
 import pytest
+import re
 import numpy as np
+from mousenet.mouse_cnn.data import Data
 
 @pytest.fixture(scope="session")
 def model(architecture="retinotopic", force=False):
@@ -12,7 +14,7 @@ def model(architecture="retinotopic", force=False):
     return model
 
 def test_retinotopics_runs(model):
-    input = torch.rand(1, 3, 64, 64)
+    input = torch.rand(1, 3, 100, 100)
     results = model(input)
     print(f"results shape is {results.shape}")
     return True
@@ -23,24 +25,54 @@ def test_retinotopics_runs(model):
 #     input = torch.rand(1, 3, 64, 64).to(device)
 #     results = model(input)
 #     print(results.shape)
+def test_retinotopics_subfields(model):
+    data = Data()
+    input = torch.rand(1, 3, 100, 100)
+    output = model.get_img_feature(input, ["VISpor5"], return_calc_graph=True, flatten=False)
+    for area in output.keys():
+        if area == "LGNd":
+            continue
+        x1, y1, x2, y2 = data.get_visual_field_shape(area)
+        height, width = output[area].shape[-2:]
+        assert width == (x2-x1)
+        assert height == (y2-y1)
+    
 
 def test_num_channels(model):
     pdb.set_trace()
-    #Visp2/3 -> Visp5. Stock is 42
-    assert model.Convs["VISp2/3VISp5"].in_channels == 42
-
-    #Visli4 -> Vispor4. Stock is 5
-    assert model.Convs["VISli4VISpor4"].in_channels == 8
+    data = Data()
+    for layer in model.network.layers:
+        source_name = layer.source_name
+        if source_name == "input":
+            continue
+        
+        layer_name = layer.source_name + layer.target_name    
+        if source_name != "LGNd":
+            area = re.split('[^[a-zA-Z]]*', layer.source_name)[0]
+            depth = layer.source_name[len(area):]
+            x1, y1, x2, y2 = data.get_visual_field_shape(f"{area}")
+            n_source_channels = int(data.get_num_neurons(area, depth) / ((y2-y1)*(x2-x1)))
+            assert model.Convs[layer_name].in_channels == n_source_channels
+        
+        area = re.split('[^[a-zA-Z]]*', layer.target_name)[0]
+        depth = layer.target_name[len(area):]
+        x1, y1, x2, y2 = data.get_visual_field_shape(f"{area}")
+        n_target_channels = int(data.get_num_neurons(area, depth) / ((y2-y1)*(x2-x1)))
+        assert model.Convs[layer_name].out_channels == n_target_channels
     
-    #VISpor2/3 -> VISpor5. Stock 29
-    assert model.Convs["VISpor2/3VISpor5"].in_channels == 159
 
 def test_kernel_sizes(model):
-    # Visp2/3 -> Visp5. Stock is (3, 3)
-    assert model.Convs["VISp2/3VISp5"].kernel_size == (3, 3)
+    # Visp2/3 -> Visp5. Stock is (5, 5)
+    assert model.Convs["VISp2/3VISp5"].kernel_size == (5, 5)
 
-    # Visli4 -> Vispor4. Stock is (15, 15)
-    assert model.Convs["VISli4VISpor4"].kernel_size == (15, 15)
+    # Visli4 -> Vispor4. Stock is (17, 17)
+    assert model.Convs["VISli4VISpor4"].kernel_size == (17, 17)
+    
+    # VISrl2/3 -> VISrl5. Stock is (7, 7)
+    assert model.Convs["VISrl2/3VISrl5"].kernel_size == (7, 7)
+
+    # VISal5 -> VISpor4. Stock is (1, 1)
+    assert model.Convs["VISal5VISpor4"].kernel_size == (1, 1)
     
     #VISpor2/3 -> VISpor5. Stock is (1, 1)
     assert model.Convs["VISpor2/3VISpor5"].kernel_size == (1, 1)
@@ -100,4 +132,8 @@ def extract_params(retinotopic=False, force=False):
     return df
 
 if __name__ == "__main__":
-    test_num_channels()
+    model = mousenet.load(architecture="retinotopic", pretraining=None, force=False)
+    model.eval()
+    input = torch.rand(1, 3, 100, 100)
+    results = model(input)
+    # test_num_channels(model)

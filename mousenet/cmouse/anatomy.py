@@ -2,7 +2,7 @@ from collections import namedtuple
 import networkx as nx
 import matplotlib.pyplot as plt
 import sys
-from ..mouse_cnn.architecture import *
+from mousenet.mouse_cnn.architecture import *
 # from config import get_output_shrinkage
 
 class AnatomicalLayer:

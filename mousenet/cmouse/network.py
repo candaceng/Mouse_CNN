@@ -1,9 +1,9 @@
 from re import A
 import numpy as np
 import networkx as nx
-from .anatomy import gen_anatomy
+from mousenet.cmouse.anatomy import gen_anatomy
 from torch import nn
-from example.config import INPUT_SIZE, EDGE_Z, INPUT_GSH, INPUT_GSW, SUBFIELDS, get_out_sigma, get_resolution
+from mousenet.example.config import INPUT_SIZE, EDGE_Z, INPUT_GSH, INPUT_GSW, SUBFIELDS, get_out_sigma, get_resolution
 import os
 import pickle
 import matplotlib.pyplot as plt
@@ -27,13 +27,13 @@ class ConvParam:
         self.gsw = gsw
         self.kernel_size = 2*int(self.gsw * EDGE_Z) + 1
 
-        KmS = int((self.kernel_size-1/out_sigma))
+        KmS = int(self.kernel_size-1) #int((self.kernel_size-1/out_sigma))
         if np.mod(KmS,2)==0:
             padding = int(KmS/2)
         else:
             padding = (int(KmS/2), int(KmS/2+1), int(KmS/2), int(KmS/2+1))
-        self.padding = padding
-        self.stride = int(1/out_sigma)
+        self.padding = 0 #padding
+        self.stride = 1 #max(1,int(1/out_sigma))
         
 class ConvLayer:
     def __init__(self, source_name, target_name, params, out_size):
@@ -121,14 +121,13 @@ class Network:
             self.area_size[e[1].area+e[1].depth] = out_size
 
             if SUBFIELDS:
-                pixel_area = calculate_pixel_area_with_visual_field(architecture, e[1].area, e[1].depth)
+                pixel_area = self.calculate_pixel_area_with_visual_field(architecture, e[1].area)
                 out_channels = np.floor(out_anat_layer.num / pixel_area)
             else:
                 out_channels = np.floor(out_anat_layer.num/out_size**2)
 
             architecture.set_num_channels(e[1].area, e[1].depth, out_channels)
             self.area_channels[e[1].area+e[1].depth] = out_channels
-            
             convlayer = ConvLayer(in_layer_name, out_layer_name, 
                                   ConvParam(in_channels=in_channels, 
                                             out_channels=out_channels,

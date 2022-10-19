@@ -168,7 +168,7 @@ class Data:
         project_root = pathlib.Path(__file__).parent.parent.resolve()
         df = pd.read_csv(os.path.join(project_root, "retinotopics", "retinomap.csv"))
         df["name"] = df["name"].apply(lambda x: x.lower())
-        return df[df["name"] == area][["x1", "y1", "x2", "y2"]].values.tolist()[0]
+        return [int(x) for x in df[df["name"] == area][["x1", "y1", "x2", "y2"]].values.tolist()[0]]
 
     def get_visual_field(self, area):
         """

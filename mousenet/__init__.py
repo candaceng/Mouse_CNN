@@ -1,1 +1,1 @@
-from .loader import load
+from mousenet.loader import load

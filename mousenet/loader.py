@@ -38,7 +38,6 @@ def load(architecture, pretraining=None, force=False):
 
     net = generate_net(architecture == "retinotopic", force)
     # mousenet = MouseNetCompletePool(net)
-
     model = MouseNetCompletePool(net)
     
 

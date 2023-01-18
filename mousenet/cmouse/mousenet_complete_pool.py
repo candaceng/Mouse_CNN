@@ -206,6 +206,7 @@ class MouseNetCompletePool(nn.Module):
                     if SUBFIELDS:
                         left, width, bottom, height = self.sub_indices[layer_name] #TODO: incorporate padding here
                         # since the input to conv is of shape: (N, C, H, W)
+                    
                         source_field = torch.narrow(torch.narrow(calc_graph[layer.source_name], 3, left, width), 2, bottom, height)
                         layer_output = self.Convs[layer_name](source_field)
                     else:
@@ -285,7 +286,8 @@ def get_subsample_indices(layer):
     bottom = target_field[1] - source_field[1]
     height = target_field[3] - target_field[1]
     left, width, bottom, height = [int(np.floor(source_resolution * x)) for x in [left, width, bottom, height]]
-    if source_area != "LGNd" and source_area != "input":
+    # if source_area != "input":
+    if True:
         source_right = int(source_field[2]-source_field[0])
         source_top = int(source_field[3]-source_field[1])
         # WIP: moddify subfield capturing from source layer to reduce padding
@@ -321,7 +323,7 @@ def get_subsample_indices(layer):
         # H_out = H_in + padding_top + padding_bottom
         # W_out = W_in + padding_left + padding_right
         layer.params.padding = [int(x) for x in [padding_left, padding_right, padding_bottom, padding_top]]
-
+    
     # indices in source frame of reference at source resolution
     left, width, bottom, height = [int(np.floor(source_resolution * x)) for x in [left, width, bottom, height]]
     return left, width, bottom, height

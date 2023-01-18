@@ -14,7 +14,7 @@ def model(architecture="retinotopic", force=False):
     return model
 
 def test_retinotopics_runs(model):
-    input = torch.rand(1, 3, 100, 100)
+    input = torch.rand(1, 3, 51, 79)
     results = model(input)
     print(f"results shape is {results.shape}")
     return True
@@ -27,7 +27,7 @@ def test_retinotopics_runs(model):
 #     print(results.shape)
 def test_retinotopics_subfields(model):
     data = Data()
-    input = torch.rand(1, 3, 100, 100)
+    input = torch.rand(1, 3, 51, 79)
     output = model.get_img_feature(input, ["VISpor5"], return_calc_graph=True, flatten=False)
     for area in output.keys():
         if area == "LGNd":
@@ -51,14 +51,14 @@ def test_num_channels(model):
             area = re.split('[^[a-zA-Z]]*', layer.source_name)[0]
             depth = layer.source_name[len(area):]
             x1, y1, x2, y2 = data.get_visual_field_shape(f"{area}")
-            n_source_channels = int(data.get_num_neurons(area, depth) / ((y2-y1)*(x2-x1)))
-            assert model.Convs[layer_name].in_channels == n_source_channels
+            n_source_channels = int(np.floor(data.get_num_neurons(area, depth) / ((y2-y1)*(x2-x1))))
+            assert model.Convs[layer_name].in_channels == n_source_channels, f"n_source_channels mismatch for {layer_name}"
         
         area = re.split('[^[a-zA-Z]]*', layer.target_name)[0]
         depth = layer.target_name[len(area):]
         x1, y1, x2, y2 = data.get_visual_field_shape(f"{area}")
-        n_target_channels = int(data.get_num_neurons(area, depth) / ((y2-y1)*(x2-x1)))
-        assert model.Convs[layer_name].out_channels == n_target_channels
+        n_target_channels = int(np.floor(data.get_num_neurons(area, depth) / ((y2-y1)*(x2-x1))))
+        assert model.Convs[layer_name].out_channels == n_target_channels, f"n_target_channels mismatch for {layer_name}"
     
 
 def test_kernel_sizes(model):

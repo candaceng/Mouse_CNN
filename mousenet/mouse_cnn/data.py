@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
-import csv
-import numpy as np
-from scipy.optimize import curve_fit
 import pathlib
-import pdb
+
+import numpy as np
 import pandas as pd
+from scipy.optimize import curve_fit
+
 """
 Interface to mouse data sources.
 """
@@ -23,14 +23,15 @@ class Data:
         """
         # return ['LGNd', 'VISp', 'VISal', 'VISpor']
 
-        #return ['LGNd', 'VISp', 'VISl', 'VISpor']
+        # return ['LGNd', 'VISp', 'VISl', 'VISpor']
 
-        return ['LGNd', 'VISp', 'VISl', 'VISrl', 'VISli', 'VISpl', 'VISal', 'VISpor']
+        return ["LGNd", "VISp", "VISl", "VISrl", "VISli", "VISpl", "VISal", "VISpor"]
+
     def get_layers(self):
         """
         :return: list of cortical layers included in model
         """
-        return ['2/3', '4', '5']
+        return ["2/3", "4", "5"]
 
     def get_hierarchical_level(self, area):
         """
@@ -39,10 +40,14 @@ class Data:
             analysis
         """
         hierarchy = {
-            'LGNd': 0,
-            'VISp': 1,
-            'VISl': 2, 'VISrl': 2, 'VISli': 2, 'VISpl': 2, 'VISal': 2,
-            'VISpor': 3
+            "LGNd": 0,
+            "VISp": 1,
+            "VISl": 2,
+            "VISrl": 2,
+            "VISli": 2,
+            "VISpl": 2,
+            "VISal": 2,
+            "VISpor": 3,
         }
         return hierarchy[area]
 
@@ -52,32 +57,34 @@ class Data:
         :param layer: layer name (e.g. '2/3')
         :return: estimate of number of excitatory neurons in given area/layer
         """
-        numbers = { 'LGNd':21200,
-                    'VISp2/3': 173253,
-                    'VISl2/3': 22299,
-                    'VISrl2/3': 22598,
-                    'VISli2/3': 9587,
-                    'VISpl2/3': 17924,
-                    'VISal2/3': 15760,
-                    'VISpor2/3': 30576,
-                    'VISp4': 108623,
-                    'VISl4': 15501,
-                    'VISrl4': 14360,
-                    'VISli4': 5620,
-                    'VISpl4': 3912,
-                    'VISal4': 9705,
-                    'VISpor4': 5952,
-                    'VISp5': 134530,
-                    'VISl5': 20826,
-                    'VISrl5': 19173,
-                    'VISli5': 11611,
-                    'VISpl5': 20041,
-                    'VISal5': 15939,
-                    'VISpor5': 30230}
-        if area == 'LGNd':
+        numbers = {
+            "LGNd": 21200,
+            "VISp2/3": 173253,
+            "VISl2/3": 22299,
+            "VISrl2/3": 22598,
+            "VISli2/3": 9587,
+            "VISpl2/3": 17924,
+            "VISal2/3": 15760,
+            "VISpor2/3": 30576,
+            "VISp4": 108623,
+            "VISl4": 15501,
+            "VISrl4": 14360,
+            "VISli4": 5620,
+            "VISpl4": 3912,
+            "VISal4": 9705,
+            "VISpor4": 5952,
+            "VISp5": 134530,
+            "VISl5": 20826,
+            "VISrl5": 19173,
+            "VISli5": 11611,
+            "VISpl5": 20041,
+            "VISal5": 15939,
+            "VISpor5": 30230,
+        }
+        if area == "LGNd":
             region = area
         else:
-            region = '%s%s'%(area, layer) 
+            region = "%s%s" % (area, layer)
         return numbers[region]
 
     # def get_num_neurons(self, area, layer):
@@ -113,7 +120,7 @@ class Data:
         :return: estimate of mean number of neurons from OTHER AREAS that synapse onto a
             single excitatory neuron in given area / layer
         """
-        return 1000 #TODO: replace with real estimate
+        return 1000  # TODO: replace with real estimate
 
     def get_hit_rate_peak(self, source_layer, target_layer):
         """
@@ -123,7 +130,9 @@ class Data:
             direction, at zero horizontal offset
         """
         hit_rate = self.b19.get_connection_probability(source_layer, target_layer)
-        fraction_of_peak = np.exp(-75**2 / 2 / self.get_hit_rate_width(source_layer, target_layer)**2)
+        fraction_of_peak = np.exp(
+            -(75**2) / 2 / self.get_hit_rate_width(source_layer, target_layer) ** 2
+        )
         return hit_rate / fraction_of_peak
 
     def get_hit_rate_width(self, source_layer, target_layer):
@@ -142,20 +151,20 @@ class Data:
         # Stepanyants, Hirsch, Martinez (2008; Cerebral Cortex) report variations in width
         # of potential connection probability depending on source and target layer in cat V1.
         # See their Figure 8B. Values below are rough manual estimates from their figure.
-        cat = { # source -> target
-            '2/3': {'2/3': 225, '4': 50, '5': 100, '6': 50},
-            '4': {'2/3': 220, '4': 180, '5': 140, '6': 110},
-            '5': {'2/3': 150, '4': 100, '5': 210, '6': 125},
-            '6': {'2/3': 120, '4': 20, '5': 150, '6': 150}
+        cat = {  # source -> target
+            "2/3": {"2/3": 225, "4": 50, "5": 100, "6": 50},
+            "4": {"2/3": 220, "4": 180, "5": 140, "6": 110},
+            "5": {"2/3": 150, "4": 100, "5": 210, "6": 125},
+            "6": {"2/3": 120, "4": 20, "5": 150, "6": 150},
         }
 
-        return cat[source_layer][target_layer] / cat['4']['4'] * l4_to_l4
+        return cat[source_layer][target_layer] / cat["4"]["4"] * l4_to_l4
 
     def get_visual_field_shape(self, area):
         """
         :param area: visual area name
         :return: (height, width) of visual field for that area, relative to a reference 64x64
-        input video representing a width 90 and height 60 degrees of visual field. 
+        input video representing a width 90 and height 60 degrees of visual field.
         """
         # We return a constant for simplicity. This is based on the range of the scale
         # bars in Figure 9C,D of ﻿J. Zhuang et al., “An extended retinotopic map of mouse cortex,”
@@ -168,7 +177,10 @@ class Data:
         project_root = pathlib.Path(__file__).parent.parent.resolve()
         df = pd.read_csv(os.path.join(project_root, "retinotopics", "retinomap.csv"))
         df["name"] = df["name"].apply(lambda x: x.lower())
-        return [int(x) for x in df[df["name"] == area][["x1", "y1", "x2", "y2"]].values.tolist()[0]]
+        return [
+            int(x)
+            for x in df[df["name"] == area][["x1", "y1", "x2", "y2"]].values.tolist()[0]
+        ]
 
     def get_visual_field(self, area):
         """
@@ -182,15 +194,20 @@ class Data:
         # TODO: these are approximate numbers
         # TODO: changing these so they all overlap VISpor -- revisit this
         fields = {
-            'VISp': [0, 85, -25, 35],
-            'VISrl': [7, 53, -23, 12],
-            'VISal': [17, 46, -5, 15],
-            'VISl': [3, 46, -5, 28],
-            'VISli': [26, 46, -5, 30],
-            'VISpl': [26, 85, -5, 32], # note this doesn't overlap VISpor at all without modification
-            'VISpor': [26, 46, -5, 4],
-            'VISam': [26, 60, -21, 5],
-            'VISpm': [26, 82, -10, 6]
+            "VISp": [0, 85, -25, 35],
+            "VISrl": [7, 53, -23, 12],
+            "VISal": [17, 46, -5, 15],
+            "VISl": [3, 46, -5, 28],
+            "VISli": [26, 46, -5, 30],
+            "VISpl": [
+                26,
+                85,
+                -5,
+                32,
+            ],  # note this doesn't overlap VISpor at all without modification
+            "VISpor": [26, 46, -5, 4],
+            "VISam": [26, 60, -21, 5],
+            "VISpm": [26, 82, -10, 6],
             # 'VISp': [0, 85, -25, 35],
             # 'VISrl': [7, 53, -23, 12],
             # 'VISal': [17, 46, 0, 15],
@@ -205,7 +222,7 @@ class Data:
         if area in fields:
             return fields[area]
         else:
-            raise Exception('Unknown visual field for area' + area)
+            raise Exception("Unknown visual field for area" + area)
 
 
 # class Ero2018:
@@ -278,37 +295,38 @@ class Perin11:
 
     def __init__(self):
         connection_probability_vs_distance = [
-                [17.441860465116307, 0.21723833429098494],
-                [52.79069767441864, 0.1676015362748359],
-                [87.44186046511628, 0.14761544742492516],
-                [122.5581395348837, 0.12294674448846282],
-                [157.67441860465118, 0.09515710527111632],
-                [192.55813953488376, 0.10208848701121961],
-                [227.44186046511635, 0.06337617564339071],
-                [262.5581395348837, 0.03480630235582299],
-                [297.44186046511635, 0.07021622765899538]]
+            [17.441860465116307, 0.21723833429098494],
+            [52.79069767441864, 0.1676015362748359],
+            [87.44186046511628, 0.14761544742492516],
+            [122.5581395348837, 0.12294674448846282],
+            [157.67441860465118, 0.09515710527111632],
+            [192.55813953488376, 0.10208848701121961],
+            [227.44186046511635, 0.06337617564339071],
+            [262.5581395348837, 0.03480630235582299],
+            [297.44186046511635, 0.07021622765899538],
+        ]
 
         def gaussian(x, peak, sigma):
-            return peak * np.exp(-x ** 2 / 2 / sigma ** 2)
+            return peak * np.exp(-(x**2) / 2 / sigma**2)
 
         cp = np.array(connection_probability_vs_distance)
-        popt, pcov = curve_fit(gaussian, cp[:,0], cp[:,1], p0=(.2, 150))
+        popt, pcov = curve_fit(gaussian, cp[:, 0], cp[:, 1], p0=(0.2, 150))
         self.width_micrometers = popt[1]
 
 
-class Billeh19():
+class Billeh19:
     """
     Data from literature review by Yazan Billeh.
     TODO: further details and reference the paper once it's published.
     """
 
     def __init__(self):
-        self._layers = ['2/3', '4', '5', '6']
+        self._layers = ["2/3", "4", "5", "6"]
         self.probabilities = [
-            [.160, .016, .083, 0],
-            [.14, .243, .104, .032],
-            [.021, .007, .116, .047],
-            [0, 0, .012, .026]
+            [0.160, 0.016, 0.083, 0],
+            [0.14, 0.243, 0.104, 0.032],
+            [0.021, 0.007, 0.116, 0.047],
+            [0, 0, 0.012, 0.026],
         ]
 
     def get_connection_probability(self, source, target):
@@ -327,28 +345,33 @@ def check_all_kernels():
     This takes something like 20 minutes to run.
     """
     data = Data()
-    cortical_areas = [area for area in data.get_areas() if not area == 'LGNd']
+    cortical_areas = [area for area in data.get_areas() if not area == "LGNd"]
     for target_area in cortical_areas:
         for source_area in cortical_areas:
-            if data.get_hierarchical_level(source_area) < data.get_hierarchical_level(target_area):
+            if data.get_hierarchical_level(source_area) < data.get_hierarchical_level(
+                target_area
+            ):
                 for target_layer in data.get_layers():
                     for source_layer in data.get_layers():
-                        print('{}{}-{}{} kernel {} micrometers'.format(
-                            source_area,
-                            source_layer,
-                            target_area,
-                            target_layer,
-                            data.get_kernel_width(source_area, source_layer, target_area, target_layer)
-                        ))
+                        print(
+                            "{}{}-{}{} kernel {} micrometers".format(
+                                source_area,
+                                source_layer,
+                                target_area,
+                                target_layer,
+                                data.get_kernel_width(
+                                    source_area, source_layer, target_area, target_layer
+                                ),
+                            )
+                        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     data = Data()
     # print((data.get_num_neurons('VISp', '4')/37)**.5)
-    print(data.get_hit_rate_width('4', '4'))
-    print(data.get_hit_rate_width('4', '2/3'))
-    print(data.get_hit_rate_width('2/3', '5'))
-
+    print(data.get_hit_rate_width("4", "4"))
+    print(data.get_hit_rate_width("4", "2/3"))
+    print(data.get_hit_rate_width("2/3", "5"))
 
     # for area in ['VISrl', 'VISli', 'VISpor']:
     #     print(area)

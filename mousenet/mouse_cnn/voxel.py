@@ -1,27 +1,32 @@
 import os
-import numpy as np
-import pickle
 import pathlib
-from mcmodels.core import VoxelModelCache
-from mousenet.mouse_cnn.flatmap import FlatMap
-from mousenet.mouse_cnn.data import Data
-import matplotlib.pyplot as plt
-from scipy.spatial import ConvexHull
-from scipy.ndimage.filters import gaussian_filter
+
 import matplotlib.path as path
-from sklearn.kernel_ridge import KernelRidge
-from skimage.morphology import h_maxima
+import matplotlib.pyplot as plt
+import numpy as np
+
+from scipy.ndimage.filters import gaussian_filter
 from scipy.optimize import curve_fit
+from scipy.spatial import ConvexHull
+from skimage.morphology import h_maxima
+from sklearn.kernel_ridge import KernelRidge
+
+from mcmodels.core import VoxelModelCache
+from mousenet.mouse_cnn.data import Data
+from mousenet.mouse_cnn.flatmap import FlatMap
 
 """
 Code for estimating density profiles of inter-area connections from voxel model
 of mouse connectome (Knox et al. 2019).
 """
 
+
 def get_data_folder():
     project_root = pathlib.Path(__file__).parent.resolve().parent.absolute()
-    return os.path.join(project_root, 'data_files')
-class VoxelModel():
+    return os.path.join(project_root, "data_files")
+
+
+class VoxelModel:
     # we make a shared instance because the model's state doesn't change
     # but it takes several seconds to instantiate, so we only want to do it once
     _instance = None
@@ -46,12 +51,14 @@ class VoxelModel():
         for i in range(len(self.source_keys)):
             if self.structure_tree.structure_descends_from(self.source_keys[i], pre_id):
                 pre_indices.append(i)
-            if self.structure_tree.structure_descends_from(self.source_keys[i], post_id):
+            if self.structure_tree.structure_descends_from(
+                self.source_keys[i], post_id
+            ):
                 post_indices.append(i)
 
         weights_by_target_voxel = []
         for pi in post_indices:
-            w = np.dot(self.weights[pre_indices,:], self.nodes[:,pi])
+            w = np.dot(self.weights[pre_indices, :], self.nodes[:, pi])
             weights_by_target_voxel.append(w)
         return weights_by_target_voxel
 
@@ -76,7 +83,7 @@ class VoxelModel():
         return VoxelModel._instance
 
 
-class Target():
+class Target:
     """
     A model of the incoming inter-area connections to a target area / layer, including
     gaussian kernel widths and peak hit rates for each inbound connection. This model
@@ -101,7 +108,7 @@ class Target():
         :param external_in_degree: Total neurons providing feedforward input to average
             neuron, from other cortical areas.
         """
-        self.data_folder=get_data_folder()
+        self.data_folder = get_data_folder()
         self.target_area = area
         self.target_name = area + layer
         self.e = external_in_degree
@@ -109,10 +116,14 @@ class Target():
         self.voxel_model = VoxelModel.get_instance()
         self.num_voxels = len(self.voxel_model.get_positions(self.target_name))
 
-        self.gamma = None # scale factor for total inbound voxel weight -> extrinsic in-degree
+        self.gamma = (
+            None  # scale factor for total inbound voxel weight -> extrinsic in-degree
+        )
 
-        self.source_names = None # list of possible extrinsic source area / layers
-        self.mean_totals = None # mean of total inbound weight across *target* voxels for each source
+        self.source_names = None  # list of possible extrinsic source area / layers
+        self.mean_totals = (
+            None  # mean of total inbound weight across *target* voxels for each source
+        )
 
     def _set_external_sources(self):
         """
@@ -122,8 +133,10 @@ class Target():
         self.source_names = []
         data = Data()
         for area in data.get_areas():
-            if data.get_hierarchical_level(area) < data.get_hierarchical_level(self.target_area):
-                if 'LGN' not in area: #TODO: handle LGN->VISp as special case
+            if data.get_hierarchical_level(area) < data.get_hierarchical_level(
+                self.target_area
+            ):
+                if "LGN" not in area:  # TODO: handle LGN->VISp as special case
                     for layer in data.get_layers():
                         self.source_names.append(area + layer)
 
@@ -167,11 +180,15 @@ class Target():
         """
         sigmas = []
 
-        weights = self.voxel_model.get_weights(source_name, self.target_name) # target voxel by source voxel
-        positions = self.voxel_model.get_positions(source_name) # source voxel by 3
+        weights = self.voxel_model.get_weights(
+            source_name, self.target_name
+        )  # target voxel by source voxel
+        positions = self.voxel_model.get_positions(source_name)  # source voxel by 3
 
         flatmap = FlatMap.get_instance()
-        positions_2d = [flatmap.get_position_2d(position) for position in positions] # source voxel by 2
+        positions_2d = [
+            flatmap.get_position_2d(position) for position in positions
+        ]  # source voxel by 2
 
         for target_voxel in range(len(weights)):
             source = Source(weights[target_voxel], positions_2d)
@@ -181,18 +198,22 @@ class Target():
                 if plot:
                     plt.clf()
                     flatmap_weights(positions_2d, weights[target_voxel])
-                    plt.title('sigma: {:0.4f} peak to border: {:0.4f}'.format(sigmas[-1], source.peak_border_distance))
+                    plt.title(
+                        "sigma: {:0.4f} peak to border: {:0.4f}".format(
+                            sigmas[-1], source.peak_border_distance
+                        )
+                    )
                     plt.tight_layout()
                     if save:
-                        plt.savefig('voxel{}.png'.format(target_voxel))
+                        plt.savefig("voxel{}.png".format(target_voxel))
                     else:
                         plt.show()
 
         return np.mean(sigmas)
 
     def flatmap_full_source_layer(self, layer, target_voxel):
-        visual_areas = ['VISp', 'VISl', 'VISrl', 'VISli', 'VISpl', 'VISal', 'VISpor']
-        visual_areas.extend(['VISpm', 'VISa', 'VISam'])
+        visual_areas = ["VISp", "VISl", "VISrl", "VISli", "VISpl", "VISal", "VISpor"]
+        visual_areas.extend(["VISpm", "VISa", "VISam"])
 
         flatmap = FlatMap.get_instance()
 
@@ -202,9 +223,13 @@ class Target():
         max_weight = 0
         for area in visual_areas:
             source_name = area + layer
-            weights = self.voxel_model.get_weights(source_name, self.target_name) # target voxel by source voxel
-            positions = self.voxel_model.get_positions(source_name) # source voxel by 3
-            positions_2d = [flatmap.get_position_2d(position) for position in positions] # source voxel by 2
+            weights = self.voxel_model.get_weights(
+                source_name, self.target_name
+            )  # target voxel by source voxel
+            positions = self.voxel_model.get_positions(source_name)  # source voxel by 3
+            positions_2d = [
+                flatmap.get_position_2d(position) for position in positions
+            ]  # source voxel by 2
             positions_2d = np.array(positions_2d)
 
             m = np.max(np.array(weights))
@@ -215,33 +240,45 @@ class Target():
             all_positions.append(positions_2d)
             source_areas.append(area)
 
-        for weights, positions_2d, source_area in zip(all_weights, all_positions, source_areas):
+        for weights, positions_2d, source_area in zip(
+            all_weights, all_positions, source_areas
+        ):
             flatmap_weights(positions_2d, weights[target_voxel])
             hull = ConvexHull(positions_2d)
             v = np.concatenate((hull.vertices, [hull.vertices[0]]))
             path = np.array([(positions_2d[i, 0], positions_2d[i, 1]) for i in v])
 
-            print('{} {}'.format(source_area, self.target_name))
+            print("{} {}".format(source_area, self.target_name))
             if self.target_area == source_area:
-                plt.plot(path[:, 0], path[:, 1], 'r')
-                target_position = self.voxel_model.get_positions(self.target_name)[target_voxel]
+                plt.plot(path[:, 0], path[:, 1], "r")
+                target_position = self.voxel_model.get_positions(self.target_name)[
+                    target_voxel
+                ]
                 target_position_2d = flatmap.get_position_2d(target_position)
-                plt.plot(target_position_2d[0], target_position_2d[1], 'rx', markersize=18)
+                plt.plot(
+                    target_position_2d[0], target_position_2d[1], "rx", markersize=18
+                )
             else:
-                plt.plot(path[:, 0], path[:, 1], 'k')
+                plt.plot(path[:, 0], path[:, 1], "k")
 
-        plt.savefig('L{}-to-{}-voxel{}.png'.format(
-            layer.replace('/', ''),
-            self.target_name.replace('/', ''),
-            target_voxel))
+        plt.savefig(
+            "L{}-to-{}-voxel{}.png".format(
+                layer.replace("/", ""), self.target_name.replace("/", ""), target_voxel
+            )
+        )
         plt.show()
 
     def __str__(self):
-        result = '{} gamma={}'.format(self.target_name, self.gamma)
+        result = "{} gamma={}".format(self.target_name, self.gamma)
         if self.source_names:
             for source, mean_total in zip(self.source_names, self.mean_totals):
-                result += '\n{} mean-total weight: {:.3}  external inputs: {:.4}'.format(
-                    source, mean_total, self.get_n_external_inputs_for_source(source))
+                result += (
+                    "\n{} mean-total weight: {:.3}  external inputs: {:.4}".format(
+                        source,
+                        mean_total,
+                        self.get_n_external_inputs_for_source(source),
+                    )
+                )
         return result
 
 
@@ -250,11 +287,13 @@ def get_surface_area_mm2(source_name):
     positions = voxel_model.get_positions(source_name)  # source voxel by 3
 
     flatmap = FlatMap.get_instance()
-    positions_2d = [flatmap.get_position_2d(position) for position in positions]  # source voxel by 2
+    positions_2d = [
+        flatmap.get_position_2d(position) for position in positions
+    ]  # source voxel by 2
     positions_2d = np.array(positions_2d)
 
     hull = ConvexHull(positions_2d)
-    return hull.volume #hull.area returns the circumference rather than the area
+    return hull.volume  # hull.area returns the circumference rather than the area
 
 
 class Source:
@@ -262,12 +301,14 @@ class Source:
         self.weights = weights
         self.positions_2d = np.array(positions_2d)
 
-        self.regression = KernelRidge(alpha=1, kernel='rbf')
+        self.regression = KernelRidge(alpha=1, kernel="rbf")
         self.regression.fit(positions_2d, weights)
 
         hull = ConvexHull(positions_2d)
         v = np.concatenate((hull.vertices, [hull.vertices[0]]))
-        self.convex_hull = path.Path([(self.positions_2d[i,0], self.positions_2d[i,1]) for i in v])
+        self.convex_hull = path.Path(
+            [(self.positions_2d[i, 0], self.positions_2d[i, 1]) for i in v]
+        )
 
         self.coords, self.image = self._get_image()
 
@@ -278,9 +319,8 @@ class Source:
         min_distance = 1e6
         for i in range(len(self.convex_hull.vertices) - 1):
             distance = _distance_to_line_segment(
-                coords,
-                self.convex_hull.vertices[i],
-                self.convex_hull.vertices[i+1])
+                coords, self.convex_hull.vertices[i], self.convex_hull.vertices[i + 1]
+            )
             if distance < min_distance:
                 min_distance = distance
         return min_distance
@@ -291,8 +331,8 @@ class Source:
         max_coords = self.coords[max_ind, :]
 
         # fine peak from local image around rough peak
-        range_x = [max_coords[0]-.25, max_coords[0]+.25]
-        range_y = [max_coords[1]-.25, max_coords[1]+.25]
+        range_x = [max_coords[0] - 0.25, max_coords[0] + 0.25]
+        range_y = [max_coords[1] - 0.25, max_coords[1] + 0.25]
         n_steps = 20
         coords = self._get_coords(n_steps, range_x=range_x, range_y=range_y)
         fine_image = self.regression.predict(coords)
@@ -318,8 +358,8 @@ class Source:
         X, Y = np.meshgrid(x, y)
 
         coords = np.zeros((n_steps**2, 2))
-        coords[:,0] = X.flatten()
-        coords[:,1] = Y.flatten()
+        coords[:, 0] = X.flatten()
+        coords[:, 1] = Y.flatten()
         return coords
 
     def _get_image(self):
@@ -337,10 +377,10 @@ class Source:
 
         prediction = np.reshape(prediction, n_steps**2)
         prediction[outside] = lowest
-        prediction[prediction < lowest + 0.2*(highest-lowest)] = lowest
+        prediction[prediction < lowest + 0.2 * (highest - lowest)] = lowest
         prediction = np.reshape(prediction, (n_steps, n_steps))
 
-        prediction = gaussian_filter(prediction, 1, mode='nearest')
+        prediction = gaussian_filter(prediction, 1, mode="nearest")
         prediction = prediction - np.min(prediction)
 
         return coords, prediction
@@ -370,8 +410,8 @@ def fit_image(weights, positions_2d):
 
     positions_2d = np.array(positions_2d)
 
-    range_x = [np.min(positions_2d[:,0]), np.max(positions_2d[:,0])]
-    range_y = [np.min(positions_2d[:,1]), np.max(positions_2d[:,1])]
+    range_x = [np.min(positions_2d[:, 0]), np.max(positions_2d[:, 0])]
+    range_y = [np.min(positions_2d[:, 1]), np.max(positions_2d[:, 1])]
 
     n_steps = 20
     x = np.linspace(range_x[0], range_x[1], n_steps)
@@ -379,12 +419,12 @@ def fit_image(weights, positions_2d):
 
     X, Y = np.meshgrid(x, y)
 
-    regression = KernelRidge(alpha=1, kernel='rbf')
+    regression = KernelRidge(alpha=1, kernel="rbf")
     regression.fit(positions_2d, weights)
 
     coords = np.zeros((n_steps**2, 2))
-    coords[:,0] = X.flatten()
-    coords[:,1] = Y.flatten()
+    coords[:, 0] = X.flatten()
+    coords[:, 1] = Y.flatten()
 
     prediction = regression.predict(coords)
     prediction = np.reshape(prediction, (n_steps, n_steps))
@@ -392,7 +432,7 @@ def fit_image(weights, positions_2d):
     hull = ConvexHull(positions_2d)
     v = np.concatenate((hull.vertices, [hull.vertices[0]]))
 
-    p = path.Path([(positions_2d[i,0], positions_2d[i,1]) for i in v])
+    p = path.Path([(positions_2d[i, 0], positions_2d[i, 1]) for i in v])
     inside = p.contains_points(coords)
     outside = [not x for x in inside]
 
@@ -401,10 +441,10 @@ def fit_image(weights, positions_2d):
 
     prediction = np.reshape(prediction, n_steps**2)
     prediction[outside] = lowest
-    prediction[prediction < lowest + 0.2*(highest-lowest)] = lowest
+    prediction[prediction < lowest + 0.2 * (highest - lowest)] = lowest
     prediction = np.reshape(prediction, (n_steps, n_steps))
 
-    prediction = gaussian_filter(prediction, 1, mode='nearest')
+    prediction = gaussian_filter(prediction, 1, mode="nearest")
     prediction = prediction - np.min(prediction)
 
     return prediction
@@ -414,8 +454,8 @@ def get_multimodal_depth_fraction(image):
     lowest = np.min(image)
     highest = np.max(image)
 
-    step = .02
-    for f in np.arange(0, 1+step, step):
+    step = 0.02
+    for f in np.arange(0, 1 + step, step):
         maxima = h_maxima(image, f * (highest - lowest))
         s = np.sum(maxima)
 
@@ -444,13 +484,13 @@ def get_center_of_mass(image):
 
 def get_gaussian_fit(image):
     X1, X0 = np.meshgrid(range(image.shape[0]), range(image.shape[1]))
-    X = np.concatenate((X0.flatten()[:,None], X1.flatten()[:,None]), axis=1)
+    X = np.concatenate((X0.flatten()[:, None], X1.flatten()[:, None]), axis=1)
 
     def gaussian(peak, mean, covariance):
         ic = np.linalg.inv(covariance)
-        offsets = (X - mean)
-        distances = [np.dot(offset, np.dot(ic, offset.T))/2 for offset in offsets]
-        return peak * np.exp(-np.array(distances)/2)
+        offsets = X - mean
+        distances = [np.dot(offset, np.dot(ic, offset.T)) / 2 for offset in offsets]
+        return peak * np.exp(-np.array(distances) / 2)
 
     def f(x, peak, m1, m2, cov11, cov12, cov22):
         return gaussian(peak, [m1, m2], [[cov11, cov12], [cov12, cov22]])
@@ -462,14 +502,16 @@ def get_gaussian_fit(image):
     cx0, cx1 = get_center_of_mass(image)
     p0 = [np.max(rescaled_image), cx0, cx1, 3, 0, 3]
     lower_bounds = [0, 0, 0, 1, 0, 1]
-    upper_bounds = [np.max(rescaled_image), s, s, s/2, s/2, s/2]
-    popt, pcov = curve_fit(f, X, rescaled_image.flatten(), bounds=(lower_bounds, upper_bounds), p0=p0)
-    popt[0] = popt[0]*scale
+    upper_bounds = [np.max(rescaled_image), s, s, s / 2, s / 2, s / 2]
+    popt, pcov = curve_fit(
+        f, X, rescaled_image.flatten(), bounds=(lower_bounds, upper_bounds), p0=p0
+    )
+    popt[0] = popt[0] * scale
 
     fit = f(None, *popt)
 
     difference = fit.reshape(image.shape) - image
-    rmse = np.mean(difference**2)**.5
+    rmse = np.mean(difference**2) ** 0.5
 
     return rmse
 
@@ -484,29 +526,31 @@ def is_multimodal_or_eccentric(weights, positions_2d):
         return False
     else:
         image = fit_image(weights, positions_2d)
-        return get_fraction_peak_at_center_of_mass(image) < .5
+        return get_fraction_peak_at_center_of_mass(image) < 0.5
 
 
-def find_radius(weights, positions_2d, deconv_sigma=.3):
+def find_radius(weights, positions_2d, deconv_sigma=0.3):
     positions_2d = np.array(positions_2d)
     total = sum(weights)
     if total == 0:
         return 0
     else:
-        center_of_mass_x = np.sum(weights * positions_2d[:,0]) / total
-        center_of_mass_y = np.sum(weights * positions_2d[:,1]) / total
-        offset_x = positions_2d[:,0] - center_of_mass_x
-        offset_y = positions_2d[:,1] - center_of_mass_y
+        center_of_mass_x = np.sum(weights * positions_2d[:, 0]) / total
+        center_of_mass_y = np.sum(weights * positions_2d[:, 1]) / total
+        offset_x = positions_2d[:, 0] - center_of_mass_x
+        offset_y = positions_2d[:, 1] - center_of_mass_y
         square_distance = offset_x**2 + offset_y**2
-        standard_deviation = (np.sum(weights * square_distance) / total)**.5
+        standard_deviation = (np.sum(weights * square_distance) / total) ** 0.5
         # weighted_mean_distance_from_center = np.sum(weights * np.sqrt(square_distance)) / total
 
-        robust_weights = weights * (square_distance < 2*standard_deviation)
+        robust_weights = weights * (square_distance < 2 * standard_deviation)
         robust_total = sum(robust_weights)
-        robust_standard_deviation = (np.sum(robust_weights * square_distance) / robust_total)**.5
+        robust_standard_deviation = (
+            np.sum(robust_weights * square_distance) / robust_total
+        ) ** 0.5
 
         # subtract variance from voxel model smoothing
-        return max(0, robust_standard_deviation**2 - deconv_sigma**2)**.5
+        return max(0, robust_standard_deviation**2 - deconv_sigma**2) ** 0.5
 
 
 def flatmap_weights(positions_2d, weights, max_weight=None):
@@ -516,12 +560,16 @@ def flatmap_weights(positions_2d, weights, max_weight=None):
 
     for position, rel_weight in zip(positions_2d, rel_weights):
         # increment gamma at sigma, 2*sigma, 3*sigma for clarity
-        gamma = .02*(rel_weight>np.exp(-(3**2)/2))+.25*(rel_weight>np.exp(-2))+.5*(rel_weight>np.exp(-1/2))
+        gamma = (
+            0.02 * (rel_weight > np.exp(-(3**2) / 2))
+            + 0.25 * (rel_weight > np.exp(-2))
+            + 0.5 * (rel_weight > np.exp(-1 / 2))
+        )
         color = [rel_weight, 0, 1 - rel_weight, gamma]
         plt.scatter(position[0], position[1], c=[color])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # for area in ['VISl', 'VISrl', 'VISli', 'VISpor']:
     #     print('\'{}\': {},'.format(area, get_surface_area_mm2(area+'2/3')))
 
@@ -545,16 +593,20 @@ if __name__ == '__main__':
     #     (rel_weights, positions_2d) = pickle.load(file)
     # print(len(rel_weights))
 
-    t = Target('VISpl', '4', external_in_degree=1000)
+    t = Target("VISpl", "4", external_in_degree=1000)
     # print('{} {} voxels'.format(t.target_name, t.num_voxels))
     # t.flatmap_full_source_layer('2/3', 10)
 
-    source_name = 'VISp2/3'
+    source_name = "VISp2/3"
     positions = t.voxel_model.get_positions(source_name)  # source voxel by 3
-    weights = t.voxel_model.get_weights(source_name, t.target_name)  # target voxel by source voxel
+    weights = t.voxel_model.get_weights(
+        source_name, t.target_name
+    )  # target voxel by source voxel
 
     flatmap = FlatMap.get_instance()
-    positions_2d = [flatmap.get_position_2d(position) for position in positions]  # source voxel by 2
+    positions_2d = [
+        flatmap.get_position_2d(position) for position in positions
+    ]  # source voxel by 2
 
     print(len(weights))
     print(len(weights[0]))
@@ -562,9 +614,9 @@ if __name__ == '__main__':
 
     for target_voxel in range(len(weights)):
         flatmap_weights(positions_2d, weights[target_voxel])
-        plt.axis('off')
-        plt.savefig('weights{}.png'.format(target_voxel))
+        plt.axis("off")
+        plt.savefig("weights{}.png".format(target_voxel))
         plt.show()
 
-    #TODO: is path better than ancestors?
+    # TODO: is path better than ancestors?
     # path = vm.structure_tree.get_structures_by_id([pre_id])[0]['structure_id_path']

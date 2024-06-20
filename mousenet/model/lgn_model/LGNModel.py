@@ -14,11 +14,12 @@ class LGNModel(nn.Module):
 
         super(LGNModel, self).__init__()
 
-        self.lgn_layer = LGNConv3DLayer(in_channels, kernel_size, path_neurons_per_filter_yaml,
+        self.lgn_layer = LGNConv3DLayer(in_channels,
+                                        kernel_size,
+                                        path_neurons_per_filter_yaml,
                                         path_param_filer_lgn_file)
 
         out_channels = self.lgn_layer.get_num_out_channels()
-
 
         in_channels = int(out_channels * np.floor((depth - 2)))
 

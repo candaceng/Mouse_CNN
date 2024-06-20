@@ -11,18 +11,20 @@ PARAM_FILTER_LGN_FILE = "../mousenet/config/data_lgn/lgn_filters_mean.csv"
 NUM_OF_NEURONS_PER_FILTER_LGN_FILE = (
     "../mousenet/config/data_lgn/num_neurons_per_filter_debug.yaml"
 )
-KERNEL_SIZE = (19, 21, 21)
+KERNEL_SIZE = (3, 3, 3)
 DEBUG = False
 
 
 def create_input_tensor(device: str) -> torch.Tensor:
-    return torch.rand((2, 3, 20, 64, 64)).to(device)
+    return torch.rand((2, 3, 21, 53, 81)).to(device)
 
 
 # Test functions
 def test_lgn_layer():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     x = create_input_tensor(device)
+    b, c, d, h, w = x.shape
+
     num_channels = x.shape[1]
     model = LGNConv3DLayer(
         in_channels=num_channels,
@@ -34,24 +36,26 @@ def test_lgn_layer():
     out_channels = model.get_num_out_channels()
 
     output = model(x).detach().cpu().numpy()
-    assert output.shape == (2, out_channels, 2, 44, 44), "Output shape mismatch"
+    assert output.shape == (b, out_channels, d-2, h-2, w-2), "Output shape mismatch"
     print("test_lgn_layer passed")
 
 
 def test_lgn_full_model():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     x = create_input_tensor(device)
+    b, c, d, h, w = x.shape
     num_channels = x.shape[1]
 
     model = LGNModel(
         num_channels,
         KERNEL_SIZE,
+        x.shape[2],
         NUM_OF_NEURONS_PER_FILTER_LGN_FILE,
         PARAM_FILTER_LGN_FILE,
     ).to(device)
 
     output = model(x).detach().cpu().numpy()
-    assert output.shape == (2, 2), "Output shape mismatch"
+    assert output.shape == (b, 5, h-2, w-2), "Output shape mismatch"
     print("test_lgn_model passed")
 
 

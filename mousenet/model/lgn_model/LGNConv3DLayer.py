@@ -76,20 +76,20 @@ class LGNConv3DLayer(nn.Module):
         )  # TODO: change for more complex param
         channel_index = 0
 
-        if DEBUG:
-            print(
-                f"B: {B}, C: {C}, D: {D}, W: {W}, H: {H}"
-                f"\nnum_channels: {self.num_channels}"
-                f"\noutput.shape: {output.shape}\n"
-            )
+        # if DEBUG:
+        #     print(
+        #         f"B: {B}, C: {C}, D: {D}, W: {W}, H: {H}"
+        #         f"\nnum_channels: {self.num_channels}"
+        #         f"\noutput.shape: {output.shape}\n"
+        #     )
 
         for filter_type, num_cells in self.neurons_per_filter.items():
             conv_output = self.convs[filter_type](input)
-            if DEBUG:
-                print(f"conv_output.shape: {conv_output.shape}")
-                print(
-                    f"output expected input shape: {output[:, channel_index:channel_index + num_cells].shape}"
-                )
+            # if DEBUG:
+            #     print(f"conv_output.shape: {conv_output.shape}")
+            #     print(
+            #         f"output expected input shape: {output[:, channel_index:channel_index + num_cells].shape}"
+            #     )
             output[:, channel_index : channel_index + num_cells] = conv_output
             channel_index += num_cells
 

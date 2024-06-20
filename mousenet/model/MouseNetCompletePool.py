@@ -2,9 +2,18 @@ import networkx as nx
 import torch
 from torch import nn
 
-from mousenet.config.config import OUTPUT_AREAS, SUBFIELDS
+from mousenet.config.config import (
+    DEBUG,
+    INPUT_SIZE,
+    KERNEL_SIZE,
+    OUTPUT_AREAS,
+    PATH_NUM_OF_NEURONS_PER_FILTER_LGN_YAML,
+    PATH_PARAM_FILTER_LGN_CSV,
+    SUBFIELDS,
+)
 from mousenet.model.cnn_layers.Conv2dMask import Conv2dMask
-from mousenet.model.subsample_polygon_indeces import get_subsample_indices
+from mousenet.model.lgn_model.LGNModel import LGNModel
+from mousenet.model.subsample_polygon_indices import get_subsample_indices
 
 
 class MouseNetCompletePool(nn.Module):
@@ -22,64 +31,48 @@ class MouseNetCompletePool(nn.Module):
         G, _ = network.make_graph()
         self.top_sort = list(nx.topological_sort(G))
 
-        # if self.retinomap is not None:
-        #     for layer in self.top_sort:
-        #         self.layer_masks[layer] = get_retinotopic_mask(layer, self.retinomap)
-        # else:
-        #     for layer in self.top_sort:
-        #         self.layer_masks[layer] = torch.ones(32, 32)
-
         for layer in network.layers:
             params = layer.params
-            self.sub_indices[layer.source_name + layer.target_name] = (
-                get_subsample_indices(layer)
-            )
+            if SUBFIELDS:
+                self.sub_indices[layer.source_name + layer.target_name] = (
+                    get_subsample_indices(layer)
+                )
 
-            self.Convs[layer.source_name + layer.target_name] = Conv2dMask(
-                params.in_channels,
-                params.out_channels,
-                params.kernel_size,
-                params.gsh,
-                params.gsw,
-                stride=params.stride,
-                mask=mask,
-                padding=params.padding,
-            )
-            ## plotting Gaussian mask
-            # plt.title('%s_%s_%sx%s'%(e[0].replace('/',''), e[1].replace('/',''), params.kernel_size, params.kernel_size))
-            # plt.savefig('%s_%s'%(e[0].replace('/',''), e[1].replace('/','')))
-            if layer.target_name not in self.BNs:
-                self.BNs[layer.target_name] = nn.BatchNorm2d(params.out_channels)
+            # if False:
+            if layer.source_name == "input" and layer.target_name == "LGNd":
+                self.Convs[layer.source_name + layer.target_name] = LGNModel(
+                    params.in_channels,
+                    KERNEL_SIZE,
+                    INPUT_SIZE[1],
+                    PATH_NUM_OF_NEURONS_PER_FILTER_LGN_YAML,
+                    PATH_PARAM_FILTER_LGN_CSV,
+                )
+                # TODO: add batch size
+            else:
+                self.Convs[layer.source_name + layer.target_name] = Conv2dMask(
+                    params.in_channels,
+                    params.out_channels,
+                    params.kernel_size,
+                    params.gsh,
+                    params.gsw,
+                    stride=params.stride,
+                    mask=mask,
+                    padding=params.padding,
+                )
 
-        print(self.sub_indices)
+                ## plotting Gaussian mask
+                # plt.title('%s_%s_%sx%s'%(e[0].replace('/',''), e[1].replace('/',''), params.kernel_size, params.kernel_size))
+                # plt.savefig('%s_%s'%(e[0].replace('/',''), e[1].replace('/','')))
+
+                if layer.target_name not in self.BNs:
+                    self.BNs[layer.target_name] = nn.BatchNorm2d(params.out_channels)
+
         # calculate total size output to classifier
         total_size = 0
 
         for area in OUTPUT_AREAS:
             layer = network.find_conv_source_target("%s2/3" % area[:-1], "%s" % area)
             total_size += int(16 * layer.params.out_channels)
-        #     if area =='VISp5':
-        #         layer = network.find_conv_source_target('VISp2/3','VISp5')
-        #         visp_out = layer.params.out_channels
-        #         # create 1x1 Conv downsampler for VISp5
-        #         visp_downsample_channels = visp_out
-        #         ds_stride = 2
-        #         self.visp5_downsampler = nn.Conv2d(visp_out, visp_downsample_channels, 1, stride=ds_stride)
-        #         total_size += INPUT_SIZE[1]/ds_stride * INPUT_SIZE[2]/ds_stride * visp_downsample_channels
-        #     else:
-        #         layer = network.find_conv_source_target('%s2/3'%area[:-1],'%s'%area)
-        #         total_size += int(layer.out_size*layer.out_size*layer.params.out_channels)
-
-        # self.classifier = nn.Sequential(
-        # nn.Linear(int(total_size), NUM_CLASSES),
-        # nn.Linear(int(total_size), HIDDEN_LINEAR),
-        # nn.ReLU(True),
-        # nn.Dropout(),
-        # nn.Linear(HIDDEN_LINEAR, HIDDEN_LINEAR),
-        # nn.ReLU(True),
-        # nn.Dropout(),
-        # nn.Linear(HIDDEN_LINEAR, NUM_CLASSES),
-        # )
 
     def get_img_feature(self, x, area_list, return_calc_graph=False, flatten=False):
         """
@@ -99,20 +92,22 @@ class MouseNetCompletePool(nn.Module):
                 layer = self.network.find_conv_source_target("input", area)
                 layer_name = layer.source_name + layer.target_name
 
-                if SUBFIELDS:
+                # TODO: extend to include subfields
+                # if SUBFIELDS:
+                if False:
                     left, width, bottom, height = self.sub_indices[layer_name]
                     # since the input to conv is of shape: (N, C, H, W)
                     source_field = torch.narrow(
                         torch.narrow(x, 3, left, width), 2, bottom, height
                     )  # TODO: check top/bottom direction
+                    # calc_graph[area] = nn.ReLU(inplace=True)(
+                    #     self.BNs[area](self.Convs[layer_name](source_field))
+                    # )
                     calc_graph[area] = nn.ReLU(inplace=True)(
-                        self.BNs[area](self.Convs[layer_name](source_field))
+                        self.Convs[layer_name](source_field)
                     )
                 else:
-                    calc_graph[area] = nn.ReLU(inplace=True)(
-                        self.BNs[area](self.Convs[layer_name](x))
-                    )
-
+                    calc_graph[area] = nn.ReLU(inplace=True)(self.Convs[layer_name](x))
                 continue
 
             for layer in self.network.layers:
@@ -124,6 +119,7 @@ class MouseNetCompletePool(nn.Module):
                     #     mask = 1
                     layer_name = layer.source_name + layer.target_name
                     if SUBFIELDS:
+                        # if False:
                         left, width, bottom, height = self.sub_indices[
                             layer_name
                         ]  # TODO: incorporate padding here
@@ -140,6 +136,14 @@ class MouseNetCompletePool(nn.Module):
                         layer_output = self.Convs[layer_name](
                             calc_graph[layer.source_name]
                         )
+
+                    # if DEBUG:
+                    #     print(f"source: {layer.source_name} - target: {layer.target_name}, layer_output.shape: {layer_output.shape}")
+                    #
+                    # if DEBUG:
+                    #     print(f"- layer_output.shape: {layer_output.shape}"
+                    #           f"\n- calc_graph[area].shape: {calc_graph[area] }")
+
                     if area not in calc_graph:
                         calc_graph[area] = layer_output
                     else:

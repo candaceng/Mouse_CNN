@@ -76,10 +76,9 @@ def load_network_from_pickle(file_path):
     return net
 
 
-def gen_network(net_name, architecture):
+def gen_network(net_name, architecture, regenerate=False):
     file_path = "./myresults/%s.pkl" % net_name
-    # if os.path.exists(file_path):
-    if False:
+    if os.path.exists(file_path) and not regenerate:
         net = load_network_from_pickle(file_path)
     else:
         net = gen_network_from_anatomy(architecture)

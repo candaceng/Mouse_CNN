@@ -2,17 +2,18 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+
 from sympy.abc import x as symbolic_x
 from sympy.abc import y as symbolic_y
-
-from mousenet.config.config import DEBUG
-from mousenet.model.lgn_model.FilterParams import FilterParams
 
 from bmtk.simulator.filternet.lgnmodel.cellmodel import TwoSubfieldLinearCell
 from bmtk.simulator.filternet.lgnmodel.linearfilter import SpatioTemporalFilter
 from bmtk.simulator.filternet.lgnmodel.spatialfilter import GaussianSpatialFilter
 from bmtk.simulator.filternet.lgnmodel.temporalfilter import TemporalFilterCosineBump
 from bmtk.simulator.filternet.lgnmodel.transferfunction import MultiTransferFunction
+
+
+from mousenet.model.lgn_model.FilterParams import FilterParams
 
 
 class LGNConv3D(nn.Conv3d):
@@ -72,21 +73,6 @@ class LGNConv3D(nn.Conv3d):
             kernels_data[i] = torch.Tensor(spatiotemporal_kernel.full())[
                 ::temporal_ds_rate
             ].repeat(in_channels, 1, 1, 1)
-            if DEBUG:
-                print("Kernel shape:", spatiotemporal_kernel.kernel.shape)
-                print(
-                    "Input to kernel data shape before repeat:",
-                    torch.Tensor(spatiotemporal_kernel.full())[
-                        ::temporal_ds_rate
-                    ].shape,
-                )
-                print(
-                    "Input to kernel data shape:",
-                    torch.Tensor(spatiotemporal_kernel.full())[::temporal_ds_rate]
-                    .repeat(in_channels, 1, 1, 1)
-                    .shape,
-                )
-                print("Kernel data [i] shape:", kernels_data[i].shape, "\n")
         return kernels_data
 
     def _create_kernel(self):

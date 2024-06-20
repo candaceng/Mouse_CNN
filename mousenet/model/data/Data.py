@@ -57,7 +57,9 @@ class Data:
         :return: estimate of number of excitatory neurons in given area/layer
         """
         numbers = {
-            "LGNd": 21200,
+            # "LGNd": 128,
+            "LGNd": 21200,  # TODO: does not matter for now,
+            # data for LGNd is taken from num_neurons_per_filter.yaml
             "VISp2/3": 173253,
             "VISl2/3": 22299,
             "VISrl2/3": 22598,
@@ -150,7 +152,9 @@ class Data:
         if area == "lgnd":
             return 0, 0, 64, 64
         project_root = pathlib.Path(__file__).parent.parent.resolve()
-        df = pd.read_csv(os.path.join(project_root, "..", "config", "retinotopics", "retinomap.csv"))
+        df = pd.read_csv(
+            os.path.join(project_root, "..", "config", "retinotopics", "retinomap.csv")
+        )
         df["name"] = df["name"].apply(lambda x: x.lower())
         return [
             int(x)

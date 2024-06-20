@@ -1,8 +1,20 @@
-# INPUT_SIZE=(3,64,64)
 DEBUG = False
 
+# C, D, H, W
+INPUT_SIZE = (3, 21, 53, 81)  # adjusted for visual subfields, h >= 53, w >= 81
+OUTPUT_LGN_MODEL = (5, 51, 79)
+# INPUT_SIZE = (3, 79, 51)
 
-INPUT_SIZE = (3, 79, 51)  # adjusted for visual subfields
+BATCH_SIZE = 2
+KERNEL_SIZE = (3, 3, 3)
+
+
+# LGN parameters:
+PATH_PARAM_FILTER_LGN_CSV = "../mousenet/config/data_lgn/lgn_filters_mean.csv"
+PATH_NUM_OF_NEURONS_PER_FILTER_LGN_YAML = (
+    "../mousenet/config/data_lgn/num_neurons_per_filter_debug.yaml"
+)
+
 INPUT_CORNER = (0, 0)  # min azimuth, min elevation of input image
 # INPUT_CORNER = (0, -50) # min azimuth, min elevation of input image
 

@@ -15,8 +15,9 @@ def get_subsample_indices(layer):
     target_area = re.split("[^[a-zA-Z]]*", layer.target_name)[0]
 
     # calculate visual field corners of input assuming input image is one pixel per degree
-    image_width = INPUT_SIZE[1]
-    image_height = INPUT_SIZE[2]
+    image_height = INPUT_SIZE[3]
+    image_width = INPUT_SIZE[2]  # TODO: height should be [2] and width [3]
+
     input_field = [
         INPUT_CORNER[0],
         INPUT_CORNER[1],
@@ -42,8 +43,8 @@ def get_subsample_indices(layer):
     left, width, bottom, height = [
         int(np.floor(source_resolution * x)) for x in [left, width, bottom, height]
     ]
-    # if source_area != "input":
-    if True:
+    if source_area != "input":
+        # if True:
         source_right = int(source_field[2] - source_field[0])
         source_top = int(source_field[3] - source_field[1])
         # WIP: moddify subfield capturing from source layer to reduce padding

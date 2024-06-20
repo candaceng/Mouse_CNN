@@ -6,6 +6,8 @@ from mousenet.config.config import (
     INPUT_GSH,
     INPUT_GSW,
     INPUT_SIZE,
+    KERNEL_SIZE,
+    OUTPUT_LGN_MODEL,
     SUBFIELDS,
     get_out_sigma,
 )
@@ -44,16 +46,22 @@ class Network:
         """
         # construct conv layer for input -> LGNd
         self.area_channels["input"] = INPUT_SIZE[0]
-        self.area_size["input"] = INPUT_SIZE[1]
+        self.area_size["input"] = OUTPUT_LGN_MODEL[1]
 
         out_sigma = 1
-        out_channels = np.floor(
-            anet.find_layer("LGNd", "").num / out_sigma / INPUT_SIZE[1] / INPUT_SIZE[2]
-        )
+        # out_channels = np.floor(
+        #     anet.find_layer("LGNd", "").num / out_sigma / INPUT_SIZE[1] / INPUT_SIZE[2]
+        # )
+        out_channels = OUTPUT_LGN_MODEL[0]
+
         architecture.set_num_channels("LGNd", "", out_channels)
         self.area_channels["LGNd"] = out_channels
 
-        out_size = INPUT_SIZE[1] * out_sigma
+        # out_size = INPUT_SIZE[1] * out_sigma
+
+        # # TODO: change hard-coded values
+        out_size = (OUTPUT_LGN_MODEL[1] // 2) * out_sigma
+
         self.area_size["LGNd"] = out_size
 
         convlayer = ConvLayer(
@@ -65,9 +73,11 @@ class Network:
                 gsh=INPUT_GSH,
                 gsw=INPUT_GSW,
                 out_sigma=out_sigma,
+                kernel_size=KERNEL_SIZE,
             ),
             out_size,
         )
+
         self.layers.append(convlayer)
 
         # construct conv layers for all other connections
@@ -84,6 +94,9 @@ class Network:
             in_conv_layer = self.find_conv_target_area(in_layer_name)
             in_size = in_conv_layer.out_size
             in_channels = in_conv_layer.params.out_channels
+            # if not isinstance(in_size, int) and not isinstance(in_size, float):  # for LGN
+            #     in_channels = in_size[0]
+            #     in_size = in_size[1]
 
             out_anat_layer = anet.find_layer(e[1].area, e[1].depth)
 
@@ -123,6 +136,10 @@ class Network:
                     out_sigma=out_sigma,
                 ),
                 out_size,
+            )
+            # convlayer.params.kernel_size = 5
+            print(
+                f"{in_layer_name} - {out_layer_name}, kernel_size: {convlayer.params.kernel_size}"
             )
 
             self.layers.append(convlayer)

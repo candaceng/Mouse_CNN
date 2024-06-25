@@ -3,7 +3,6 @@ import torch
 from torch import nn
 
 from mousenet.config.config import (
-    DEBUG,
     INPUT_SIZE,
     KERNEL_SIZE,
     OUTPUT_AREAS,
@@ -47,7 +46,8 @@ class MouseNetCompletePool(nn.Module):
                     PATH_NUM_OF_NEURONS_PER_FILTER_LGN_YAML,
                     PATH_PARAM_FILTER_LGN_CSV,
                 )
-                # TODO: add batch size
+                self.BNs[layer.target_name] = nn.BatchNorm2d(5)
+
             else:
                 self.Convs[layer.source_name + layer.target_name] = Conv2dMask(
                     params.in_channels,
@@ -59,10 +59,6 @@ class MouseNetCompletePool(nn.Module):
                     mask=mask,
                     padding=params.padding,
                 )
-
-                ## plotting Gaussian mask
-                # plt.title('%s_%s_%sx%s'%(e[0].replace('/',''), e[1].replace('/',''), params.kernel_size, params.kernel_size))
-                # plt.savefig('%s_%s'%(e[0].replace('/',''), e[1].replace('/','')))
 
                 if layer.target_name not in self.BNs:
                     self.BNs[layer.target_name] = nn.BatchNorm2d(params.out_channels)
@@ -92,34 +88,15 @@ class MouseNetCompletePool(nn.Module):
                 layer = self.network.find_conv_source_target("input", area)
                 layer_name = layer.source_name + layer.target_name
 
-                # TODO: extend to include subfields
-                # if SUBFIELDS:
-                if False:
-                    left, width, bottom, height = self.sub_indices[layer_name]
-                    # since the input to conv is of shape: (N, C, H, W)
-                    source_field = torch.narrow(
-                        torch.narrow(x, 3, left, width), 2, bottom, height
-                    )  # TODO: check top/bottom direction
-                    # calc_graph[area] = nn.ReLU(inplace=True)(
-                    #     self.BNs[area](self.Convs[layer_name](source_field))
-                    # )
-                    calc_graph[area] = nn.ReLU(inplace=True)(
-                        self.Convs[layer_name](source_field)
-                    )
-                else:
-                    calc_graph[area] = nn.ReLU(inplace=True)(self.Convs[layer_name](x))
+                calc_graph[area] = nn.ReLU(inplace=True)(
+                    self.BNs[area](self.Convs[layer_name](x))
+                )
                 continue
 
             for layer in self.network.layers:
                 if layer.target_name == area:
-                    # mask = None
-                    # if layer.source_name in self.layer_masks:
-                    #     mask = self.layer_masks[layer.source_name]
-                    # if mask is None:
-                    #     mask = 1
                     layer_name = layer.source_name + layer.target_name
                     if SUBFIELDS:
-                        # if False:
                         left, width, bottom, height = self.sub_indices[
                             layer_name
                         ]  # TODO: incorporate padding here
@@ -136,13 +113,6 @@ class MouseNetCompletePool(nn.Module):
                         layer_output = self.Convs[layer_name](
                             calc_graph[layer.source_name]
                         )
-
-                    # if DEBUG:
-                    #     print(f"source: {layer.source_name} - target: {layer.target_name}, layer_output.shape: {layer_output.shape}")
-                    #
-                    # if DEBUG:
-                    #     print(f"- layer_output.shape: {layer_output.shape}"
-                    #           f"\n- calc_graph[area].shape: {calc_graph[area] }")
 
                     if area not in calc_graph:
                         calc_graph[area] = layer_output

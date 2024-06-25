@@ -49,8 +49,7 @@ def mousenet_inference(model, device):
 
         input_tensor = input_tensor.to(device)
         output = model(input_tensor)
-
-    print(output)
+    return output
 
 
 def setup_device(mousenet, device):
@@ -87,5 +86,6 @@ if __name__ == "__main__":
 
     # Inference
     start_time = time.time()
-    mousenet_inference(mousenet, DEVICE)
-    print("Inference complete, t: {time.time() - start_time:.2f} seconds")
+    output = mousenet_inference(mousenet, DEVICE)
+    print(f"Inference complete, t: {time.time() - start_time:.2f} seconds")
+    print("Output shape: ", output.shape)

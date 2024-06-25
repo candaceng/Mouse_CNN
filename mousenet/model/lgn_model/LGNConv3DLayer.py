@@ -1,3 +1,4 @@
+from typing import Tuple
 import os
 
 import pandas as pd
@@ -5,7 +6,6 @@ import torch
 import torch.nn as nn
 import yaml
 
-from mousenet.config.config import DEBUG
 from mousenet.model.lgn_model.FilterParams import FilterParams
 from mousenet.model.lgn_model.LGNConv3D import LGNConv3D
 
@@ -17,9 +17,14 @@ class LGNConv3DLayer(nn.Module):
         kernel_size,
         path_neurons_per_filter_yaml,
         path_param_filer_lgn_file,
+        stride: Tuple[int, int, int] = (1, 1, 1),
+        padding: Tuple[int, int, int] = (0, 0, 0),
     ):
         super().__init__()
         self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+
         self.neurons_per_filter = self._load_neurons_per_filter(
             path_neurons_per_filter_yaml
         )
@@ -55,7 +60,12 @@ class LGNConv3DLayer(nn.Module):
         for filter_type, num_cells in self.neurons_per_filter.items():
             params_for_filter_type = self._get_parameters_for_filter_type(filter_type)
             conv_layers[filter_type] = LGNConv3D(
-                in_channels, num_cells, self.kernel_size, params_for_filter_type
+                in_channels,
+                num_cells,
+                self.kernel_size,
+                params_for_filter_type,
+                stride=self.stride,
+                padding=self.padding,
             )
         return conv_layers
 
@@ -64,32 +74,19 @@ class LGNConv3DLayer(nn.Module):
             input.shape
         )  # batch size, number of channels, depth, width, height
 
-        output = torch.empty(
-            (
-                B,
-                self.num_channels,
-                D - self.kernel_size[0] + 1,
-                W - self.kernel_size[1] + 1,
-                H - self.kernel_size[2] + 1,
-            ),
-            device=input.device,
-        )  # TODO: change for more complex param
-        channel_index = 0
+        output_shape = (
+            B,
+            self.num_channels,
+            (D + 2 * self.padding[0] - self.kernel_size[0]) // self.stride[0] + 1,
+            (W + 2 * self.padding[1] - self.kernel_size[1]) // self.stride[1] + 1,
+            (H + 2 * self.padding[2] - self.kernel_size[2]) // self.stride[2] + 1,
+        )
+        output = torch.empty(output_shape, device=input.device)
 
-        # if DEBUG:
-        #     print(
-        #         f"B: {B}, C: {C}, D: {D}, W: {W}, H: {H}"
-        #         f"\nnum_channels: {self.num_channels}"
-        #         f"\noutput.shape: {output.shape}\n"
-        #     )
+        channel_index = 0
 
         for filter_type, num_cells in self.neurons_per_filter.items():
             conv_output = self.convs[filter_type](input)
-            # if DEBUG:
-            #     print(f"conv_output.shape: {conv_output.shape}")
-            #     print(
-            #         f"output expected input shape: {output[:, channel_index:channel_index + num_cells].shape}"
-            #     )
             output[:, channel_index : channel_index + num_cells] = conv_output
             channel_index += num_cells
 

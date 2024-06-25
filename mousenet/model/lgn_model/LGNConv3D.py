@@ -2,7 +2,6 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-
 from sympy.abc import x as symbolic_x
 from sympy.abc import y as symbolic_y
 
@@ -23,8 +22,12 @@ class LGNConv3D(nn.Conv3d):
         out_channels: int,
         kernel_size: Tuple[int, int, int],
         filter_params: FilterParams,
+        stride: Tuple[int, int, int] = (1, 1, 1),
+        padding: Tuple[int, int, int] = (0, 0, 0),
     ):
-        super().__init__(in_channels, out_channels, kernel_size)
+        super().__init__(
+            in_channels, out_channels, kernel_size, stride=stride, padding=padding
+        )
         self.num_neurons = out_channels
         self.filter_params = filter_params
 

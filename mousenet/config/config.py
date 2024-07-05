@@ -10,9 +10,9 @@ KERNEL_SIZE = (3, 3, 3)
 
 
 # LGN parameters:
-PATH_PARAM_FILTER_LGN_CSV = "../mousenet/config/data_lgn/lgn_filters_mean.csv"
+PATH_PARAM_FILTER_LGN_CSV = "../mousenet/config/data_lgn/lgn_model_filters.csv"
 PATH_NUM_OF_NEURONS_PER_FILTER_LGN_YAML = (
-    "../mousenet/config/data_lgn/num_neurons_per_filter_debug.yaml"
+    "../mousenet/config/data_lgn/num_neurons_per_filter.yaml"
 )
 
 INPUT_CORNER = (0, 0)  # min azimuth, min elevation of input image

@@ -7,9 +7,9 @@ from mousenet.model.lgn_model.LGNConv3DLayer import LGNConv3DLayer
 from mousenet.model.lgn_model.LGNModel import LGNModel
 
 # Constants
-PARAM_FILTER_LGN_FILE = "../mousenet/config/data_lgn/lgn_filters_mean.csv"
+PARAM_FILTER_LGN_FILE = "../mousenet/config/data_lgn/lgn_model_filters.csv"
 NUM_OF_NEURONS_PER_FILTER_LGN_FILE = (
-    "../mousenet/config/data_lgn/num_neurons_per_filter_debug.yaml"
+    "../mousenet/config/data_lgn/num_neurons_per_filter.yaml"
 )
 KERNEL_SIZE = (3, 3, 3)
 STRIDE = (2, 2, 1)

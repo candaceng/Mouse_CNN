@@ -21,7 +21,7 @@ class Data:
         """
         :return: list of names of visual areas included in the model
         """
-        return ["LGNd", "VISp", "VISl", "VISrl", "VISli", "VISpl", "VISal", "VISpor"]
+        return ["LGNd", "VISp", "VISl", "VISrl", "VISli", "VISpl", "VISal", "VISpm", "VISa", "VISpor", "VISam"]
 
     @staticmethod
     def get_layers():
@@ -45,7 +45,10 @@ class Data:
             "VISli": 2,
             "VISpl": 2,
             "VISal": 2,
-            "VISpor": 3,
+            "VISpm": 3,
+            "VISa": 3,
+            "VISpor": 4,
+            "VISam": 4,
         }
         return hierarchy[area]
 
@@ -60,27 +63,36 @@ class Data:
             # "LGNd": 128,
             "LGNd": 21200,  # TODO: does not matter for now,
             # data for LGNd is taken from num_neurons_per_filter.yaml
-            "VISp2/3": 173253,
-            "VISl2/3": 22299,
+            "VISp2/3": 146206, 
+            "VISl2/3": 15727, 
             "VISrl2/3": 22598,
             "VISli2/3": 9587,
-            "VISpl2/3": 17924,
-            "VISal2/3": 15760,
+            "VISpl2/3": 17266, 
+            "VISal2/3": 45149,  
+            "VISpm2/3": 66996,
             "VISpor2/3": 30576,
-            "VISp4": 108623,
-            "VISl4": 15501,
+            "VISa2/3": 34889,
+            "VISam2/3": 47712,
+            "VISp4": 80668,   
+            "VISl4": 6549,    
             "VISrl4": 14360,
             "VISli4": 5620,
-            "VISpl4": 3912,
-            "VISal4": 9705,
+            "VISpl4": 8309,   
+            "VISal4": 20500,   
+            "VISpm4": 19075,
             "VISpor4": 5952,
-            "VISp5": 134530,
-            "VISl5": 20826,
+            "VISa4": 15195,
+            "VISam4": 17217,
+            "VISp5": 123928,
+            "VISl5": 10848,   
             "VISrl5": 19173,
             "VISli5": 11611,
-            "VISpl5": 20041,
-            "VISal5": 15939,
+            "VISpl5": 14387,    
+            "VISal5": 43972,   
+            "VISpm5": 50364,
             "VISpor5": 30230,
+            "VISa5": 27881,
+            "VISam5": 35776,
         }
         if area == "LGNd":
             region = area

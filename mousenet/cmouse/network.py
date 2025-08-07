@@ -48,6 +48,22 @@ class ConvLayer:
         self.target_name = target_name
         self.out_size = out_size
 
+    def to_torch_layer(self):
+        kernel_size = int(self.params.gsw)  # gsw = kernel width
+        padding = kernel_size // 2  # for 'same' padding
+        in_channels = int(self.params.in_channels)
+        out_channels = int(self.params.out_channels)
+
+        return nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=padding
+            ),
+            nn.ReLU()
+        )
 
 class Network:
     """

@@ -3,7 +3,7 @@ import argparse
 import os 
 
 # INPUT_SIZE=(3,64,64)
-INPUT_SIZE=(3,79, 51) # adjusted for visual subfields
+INPUT_SIZE=[2, 64, 64] #(3,79, 51) # adjusted for visual subfields
 INPUT_CORNER = (0, 0) # min azimuth, min elevation of input image
 # INPUT_CORNER = (0, -50) # min azimuth, min elevation of input image
 

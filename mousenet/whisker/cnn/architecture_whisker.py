@@ -79,22 +79,56 @@ class WhiskerArchitecture:
         linear_um = 1000 * self.surface_areas[area]  
         return linear_pixels / linear_um
 
-    def get_connection_probability(self, source, target):
+    # def get_connection_probability(self, source, target):
+    #     layers = ['2/3', '4', '5', '6']
+    #     probabilities = [
+    #         [.160, .016, .083, 0],
+    #         [.14, .243, .104, .032],
+    #         [.021, .007, .116, .047],
+    #         [0, 0, .012, .026]
+    #     ]
+    #     assert source in layers
+    #     assert target in layers
+
+    #     source_index = layers.index(source)
+    #     target_index = layers.index(target)
+
+    #     return probabilities[source_index][target_index]
+    
+    def get_connection_probability(self, source, target, area=None):
+        """
+        :param source: one of {'2/3','4','5','6'}
+        :param target: one of {'2/3','4','5','6'}
+        :param area: area name (e.g., 'VISrl', 'SSp-bfd', 'SSs')
+
+        :return: P(source→target) using either MouseNet's visual matrix or an S1 (barrel) matrix
+        """
+
         layers = ['2/3', '4', '5', '6']
-        probabilities = [
-            [.160, .016, .083, 0],
-            [.14, .243, .104, .032],
-            [.021, .007, .116, .047],
-            [0, 0, .012, .026]
+
+        # MouseNet probabilities for VIS
+        PROB_VIS = [
+            [0.160, 0.016, 0.083, 0.000],
+            [0.140, 0.243, 0.104, 0.032],
+            [0.021, 0.007, 0.116, 0.047],
+            [0.000, 0.000, 0.012, 0.026],
         ]
-        assert source in layers
-        assert target in layers
+
+        # S1 barrel (Lefort 2009 C2 column), collapsed to 4×4 (L2/3 and L5A/B merged by weights)
+        PROB_S1 = [
+            [0.134, 0.137, 0.021, 0.000],  # 2/3 →
+            [0.019, 0.243, 0.007, 0.000],  # 4   →
+            [0.093, 0.095, 0.081, 0.014],  # 5   →
+            [0.000, 0.009, 0.055, 0.028],  # 6   →
+        ]
+
+        probabilities = PROB_VIS if area.startswith('VIS') else PROB_S1
 
         source_index = layers.index(source)
         target_index = layers.index(target)
 
         return probabilities[source_index][target_index]
-    
+
     def get_hit_rate_width(self, source_layer, target_layer):
         """
         :param source_layer: name of presynaptic layer
@@ -120,16 +154,19 @@ class WhiskerArchitecture:
 
         return cat[source_layer][target_layer] / cat['4']['4'] * l4_to_l4
     
-    def get_hit_rate_peak(self, source_layer, target_layer):
+    def get_hit_rate_peak(self, source_layer, target_layer, area):
         """
         :param source_layer: name of presynaptic layer
         :param target_layer: name of postsynaptic layer
         :return: fraction of excitatory neuron pairs with functional connection in this
             direction, at zero horizontal offset
         """
-        hit_rate = self.get_connection_probability(source_layer, target_layer)
-        fraction_of_peak = np.exp(-75**2 / 2 / self.get_hit_rate_width(source_layer, target_layer)**2)
-        return hit_rate / fraction_of_peak
+        hit_rate = self.get_connection_probability(source_layer, target_layer, area=area)
+        offset = 75 if area.startswith('VIS') else 0
+
+        fraction_of_peak = np.exp(-offset**2 / 2 / self.get_hit_rate_width(source_layer, target_layer)**2)
+
+        return hit_rate / fraction_of_peak 
 
     def get_kernel_width_pixels(self, source_area, source_layer, target_area, target_layer):
         if source_area == target_area: # from interlaminar hit rate spatial profile
@@ -143,7 +180,7 @@ class WhiskerArchitecture:
 
     def get_kernel_peak_probability(self, source_area, source_layer, target_area, target_layer):
         if source_area == target_area: # from interlaminar hit rates
-            return self.get_hit_rate_peak(source_layer, target_layer)
+            return self.get_hit_rate_peak(source_layer, target_layer, source_area)
         
         d_w = self.get_kernel_width_pixels(source_area, source_layer, target_area, target_layer)
         source_channels = self.get_channels(source_area, source_layer)

@@ -39,18 +39,45 @@ class ConvLayer:
         self.target_name = target_name
         self.out_size = out_size
     
-class TemporalBarrelColumn(nn.Module):
-    def __init__(self, in_dim=4, embed_dim=128):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(in_dim, 32),
-            nn.ReLU(),
-            nn.Linear(32, embed_dim)
-        )
+# class TemporalBarrelColumn(nn.Module):
+#     def __init__(self, in_dim=4, embed_dim=128):
+#         super().__init__()
+#         self.encoder = nn.Sequential(
+#             nn.Linear(in_dim, 32),
+#             nn.ReLU(),
+#             nn.Linear(32, embed_dim)
+#         )
 
-    def forward(self, x):    # x: (batch, 15, 4)
-        x = self.encoder(x)  # (batch, 15, embed_dim)
-        return x.mean(dim=1)  # (batch, embed_dim)
+#     def forward(self, x):    # x: (batch, 15, 4)
+#         x = self.encoder(x)  # (batch, 15, embed_dim)
+#         return x.mean(dim=1)  # (batch, embed_dim)
+
+class SharedTemporalBarrelEncoder(nn.Module):
+    def __init__(self, in_dim=3, embed_dim=128, hidden_dim=32, num_layers=1):
+        super().__init__()
+        self.frame_mlp = nn.Sequential(
+            nn.Linear(in_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, embed_dim),
+        )
+        self.rnn = nn.GRU(
+            input_size=embed_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=False,
+        )
+        self.proj = nn.Linear(hidden_dim, embed_dim)
+
+    def forward(self, x):  # x: (B, N, T, in_dim)
+        B, N, T, D = x.shape
+        x = x.reshape(B * N, T, D)        # (B*N, T, in_dim)
+        x = self.frame_mlp(x)             # (B*N, T, embed_dim)
+        _, h = self.rnn(x)                # h: (num_layers, B*N, hidden_dim)
+        h_last = h[-1]                    # (B*N, hidden_dim)
+        emb = self.proj(h_last)           # (B*N, embed_dim)
+        return emb.reshape(B, N, -1)      # (B, N, embed_dim)
+
     
 def index_whisker_grid(whisker_names):
     grid = [
@@ -87,7 +114,7 @@ def make_gaussian_mask(peak, sigma, size):
     return mask  # shape: (size, size)
 
 class WhiskerEncoder(nn.Module):
-    def __init__(self, arch, num_whiskers=60, in_dim=4, output_dim=128):
+    def __init__(self, arch, num_whiskers=60, in_dim=3, output_dim=128):
         super().__init__()
 
         embed_dim = arch.get_channels('SSp-bfd', '4')
@@ -100,14 +127,21 @@ class WhiskerEncoder(nn.Module):
             "E2", "E3", "E4", "E5", "E6", "E7"
         ]
 
-        self.barrels = nn.ModuleList([
-            TemporalBarrelColumn(in_dim, embed_dim) for _ in range(num_whiskers)
-        ])
+        # self.barrels = nn.ModuleList([
+        #     TemporalBarrelColumn(in_dim, embed_dim) for _ in range(num_whiskers)
+        # ])
+
+        self.temporal = SharedTemporalBarrelEncoder(
+            in_dim=in_dim,
+            embed_dim=embed_dim,
+            hidden_dim=32,      # try 32 first
+            num_layers=1
+        )
 
         self.grid_indices = index_whisker_grid(self.whisker_names)
 
-        anet = gen_anatomy(arch)  
-        self.construct_from_anatomy(anet, arch)
+        self.anet = gen_anatomy(arch)  
+        self.construct_from_anatomy(self.anet, arch)
 
         self.output_fc = nn.Linear(self.area_channels['VISrl5'], output_dim)
 
@@ -174,10 +208,11 @@ class WhiskerEncoder(nn.Module):
             )
 
     
-    def forward(self, whisker_input):  # (B, 60, 15, 4)
+    def forward(self, whisker_input):  # (B, 60, 15, 3)
         B = whisker_input.shape[0]
-        barrel_outputs = [barrel(whisker_input[:, i]) for i, barrel in enumerate(self.barrels)]
-        x = torch.stack(barrel_outputs, dim=1)  # (B, 60, embed_dim)
+        # barrel_outputs = [barrel(whisker_input[:, i]) for i, barrel in enumerate(self.barrels)]
+        # x = torch.stack(barrel_outputs, dim=1)  # (B, 60, embed_dim)
+        x = self.temporal(whisker_input)  # (B, 60, embed_dim)
 
         left_embed = x[:, :30, :]
         right_embed = x[:, 30:, :]

@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from whisker.cnn.whisker_encoder import *
-from contextlib import contextmanager
+from byob import *
 
 class PreprocessedTrialDataset(Dataset):
     def __init__(self, pt_folder):
@@ -18,9 +18,27 @@ class PreprocessedTrialDataset(Dataset):
         data = torch.load(self.pt_files[idx])
         image_left = data["image_left"]    # [1, 64, 64]
         image_right = data["image_right"]  # [1, 64, 64]
-        whisker = torch.cat([data["whisker_L"], data["whisker_R"]], dim=0)  # [batch size, 60, 15, 4]
+        whisker = torch.cat([data["whisker_L"], data["whisker_R"]], dim=0)  # [batch size, 60, 15, 3]
         return image_left, image_right, whisker
-    
+
+    # def __getitem__(self, idx):
+    #     data = torch.load(self.pt_files[idx])  # or np.load
+
+    #     contact = data["contact"]        # (60, T)
+    #     s = data["s"]                    # (60, T)
+    #     theta = data["theta"]            # (60, T)
+
+    #     s = s / self.max_whisker_length  # normalize to [0,1]
+
+    #     whisker_feats = torch.stack([
+    #         contact,
+    #         s,
+    #         torch.sin(theta),
+    #         torch.cos(theta)
+    #     ], dim=-1)                       # (60, T, 4)
+
+    #     return whisker_feats
+        
 class WhiskerToVISRLFusion(nn.Module):
     """
     Make a spatial (H×W) whisker map and fuse it into VISrl with a 1×1 conv.
@@ -139,7 +157,6 @@ class InhibitoryFiLM(nn.Module):
             self.last_scale_max  = scale.max().item()
             self.last_supp_ratio = (y.abs().mean() / (fmap.abs().mean() + 1e-8)).item()
         return y
-    
         
 class MultimodalMouseModel(nn.Module):
     def __init__(self, visual_net, embed_dim=128, learnable_temp=True, temp=0.2):
@@ -151,7 +168,7 @@ class MultimodalMouseModel(nn.Module):
             self.register_buffer("log_temp", torch.tensor(np.log(temp), dtype=torch.float32))
         
         self.visual_net = visual_net
-        self.whisker_encoder = WhiskerEncoder(num_whiskers=60, in_dim=4, arch=WhiskerArchitecture(), output_dim=128)
+        self.whisker_encoder = WhiskerEncoder(num_whiskers=60, in_dim=3, arch=WhiskerArchitecture(), output_dim=128)
         self.retinotopic = visual_net.network.retinotopic
         self._visual_in_ch = 2 if self.retinotopic else 1
 
@@ -161,7 +178,19 @@ class MultimodalMouseModel(nn.Module):
         visrl_map = self.visual_net.get_img_feature(dummy, ['VISrl5'], flatten=False)
         C_rl, H_rl, W_rl = visrl_map.shape[1:]
 
-        # NEW: spatial fusion module (whisker -> VISrl)
+        # -- BYOB heads on neuronal layers --
+        self.byob_w = BYOBlock(d_in=128, d_proj=256, d_hid=512, momentum=0.996)   # whisker code
+        self.byob_f = BYOBlock(d_in=C_rl, d_proj=256, d_hid=512, momentum=0.996)   # fused VISrl (channel-pooled)
+
+        # small, modality-appropriate view makers
+        self.view_vision = CorrelatedNoiseVision(sigma=0.02, spatial_prob=0.3,
+                                         blur_ks=3, blur_sigma=1.0,
+                                         channel_rank=16, channel_strength=0.5)
+        self.view_whisker = TemporalWhiskerNoise(sigma=0.01, temporal_ks=3, temporal_sigma=1.0, frame_drop_prob=0.05)
+        # self.view_vision = CorrelatedNoiseVision(sigma=0.02, blur_prob=0.3)
+        # self.view_whisker = CorrelatedNoiseWhisker(sigma=0.01, drop_prob=0.05)
+
+        # spatial fusion module (whisker -> VISrl)
         # num_ports=4 for quadrants, prob have to change to account for retinotopic = True
         self.visrl_fusion = WhiskerToVISRLFusion(
             whisker_dim=128,
@@ -196,8 +225,6 @@ class MultimodalMouseModel(nn.Module):
         self._gate_enabled = True
         self._current_z = None
 
-        self._hook_dbg_n = 0
-        self._hook_dbg_max = 3   # only print on first 3 calls
         def _visp_hook(_mod, _inp, out):
             # out: (B, C_visp, H, W)
             if (not self._gate_enabled) or (self._current_z is None):
@@ -206,10 +233,6 @@ class MultimodalMouseModel(nn.Module):
             pre = out.detach().abs().mean().item()          # mean magnitude before gating
             gated = self.visp_gate(self._current_z, out)    # apply FiLM (inhibition)
             post = gated.detach().abs().mean().item()       # after gating
-
-            if self._hook_dbg_n < self._hook_dbg_max:
-                print(f"[VISp hook] out={tuple(out.shape)} pre={pre:.4f} post={post:.4f}")
-                self._hook_dbg_n += 1
 
             return gated
 
@@ -239,37 +262,180 @@ class MultimodalMouseModel(nn.Module):
         on  = torch.relu(x - mu)
         off = torch.relu(mu - x)
         return torch.cat([on, off], dim=1)     # (B, 2, H, W)
-    
+
     def forward(self, image_left, image_right, whisker):
-        # 0) make images match the required input channels if retinotopic
-        if self.retinotopic:
+        # (0) Ensure correct visual input channels
+        if self._visual_in_ch == 2 and image_left.shape[1] == 1:
             image_left  = self._to_on_off(image_left)
             image_right = self._to_on_off(image_right)
+        elif self._visual_in_ch == 1 and image_left.shape[1] == 2:
+            # collapse back to grayscale if visual_net expects 1ch
+            image_left  = image_left.mean(dim=1, keepdim=True)
+            image_right = image_right.mean(dim=1, keepdim=True)
 
-        # 1) whisker latent first (so the VISp hook can use it)
+        # (a) Whisker latent FIRST so hook can read it
         w_embed = self.whisker_encoder(whisker)
         self._current_z = w_embed
 
-        # 2) run vision (hook fires inside)
+        # (b) Run vision (hook applies VISp inhibition)
         v_map_left  = self.visual_net.get_img_feature(image_left,  ['VISrl5'], flatten=False)
         v_map_right = self.visual_net.get_img_feature(image_right, ['VISrl5'], flatten=False)
 
-        # 3) fuse into VISrl
+        # (c) VISrl spatial fusion
         v_map_left  = self.visrl_fusion(v_map_left,  w_embed)
         v_map_right = self.visrl_fusion(v_map_right, w_embed)
 
-        # 4) flatten + project
+        # (d) Flatten + project
         v_feat_left  = v_map_left.view(image_left.size(0),  -1)
         v_feat_right = v_map_right.view(image_right.size(0), -1)
         v_embed = self.visual_fc(torch.cat([v_feat_left, v_feat_right], dim=1))
 
         self._current_z = None
         return v_embed, w_embed
+    
+    # BYOB loss computation (local, pre-readout)
+    def byob_loss_step(self, image_left, image_right, whisker):
+        # 1) create two views with correlated variability
+        il1, ir1 = self.view_vision(image_left),  self.view_vision(image_right)
+        il2, ir2 = self.view_vision(image_left),  self.view_vision(image_right)
+        w1, w2   = self.view_whisker(whisker),    self.view_whisker(whisker)
 
+        # ensure ON/OFF if needed
+        if self._visual_in_ch == 2 and il1.shape[1] == 1:
+            il1, ir1 = self._to_on_off(il1), self._to_on_off(ir1)
+            il2, ir2 = self._to_on_off(il2), self._to_on_off(ir2)
+
+        # 2) encode both views to neuronal layers
+        # whisker codes (these are your "neuronal" whisker latents)
+        h_w1 = self.whisker_encoder(w1)  # [B,128]
+        h_w2 = self.whisker_encoder(w2)
+
+        # fused VISrl maps for both views (via same hook/gate path)
+        self._current_z = h_w1
+        fm_l1 = self.visual_net.get_img_feature(il1, ['VISrl5'], flatten=False)
+        fm_r1 = self.visual_net.get_img_feature(ir1, ['VISrl5'], flatten=False)
+        fm_l1 = self.visrl_fusion(fm_l1, h_w1)
+        fm_r1 = self.visrl_fusion(fm_r1, h_w1)
+        h_f1  = (fm_l1.mean(dim=(2,3)) + fm_r1.mean(dim=(2,3))) * 0.5  # [B,C_rl]
+
+        self._current_z = h_w2
+        fm_l2 = self.visual_net.get_img_feature(il2, ['VISrl5'], flatten=False)
+        fm_r2 = self.visual_net.get_img_feature(ir2, ['VISrl5'], flatten=False)
+        fm_l2 = self.visrl_fusion(fm_l2, h_w2)
+        fm_r2 = self.visrl_fusion(fm_r2, h_w2)
+        h_f2  = (fm_l2.mean(dim=(2,3)) + fm_r2.mean(dim=(2,3))) * 0.5  # [B,C_rl]
+        self._current_z = None
+
+        # 3) BYOB losses (local to neuronal layers)
+        loss_w = self.byob_w.loss(h_w1, h_w2)
+        loss_f = self.byob_f.loss(h_f1, h_f2)
+
+        # 4) EMA update of targets
+        with torch.no_grad():
+            self.byob_w.update_target()
+            self.byob_f.update_target()
+
+        # Optional collapse monitors (variance > 0 is good)
+        with torch.no_grad():
+            var_w = h_w1.var(dim=0).mean().item()
+            var_f = h_f1.var(dim=0).mean().item()
+
+        return {"loss_w": loss_w, "loss_f": loss_f, "var_w": var_w, "var_f": var_f}
+    
+    # -------- Inference helpers --------
+
+    def _prep_visual_inputs(self, image_left, image_right=None):
+        """
+        Match the channel convention expected by visual_net:
+        - If retinotopic ON/OFF is expected (2ch) and inputs are 1ch, convert to ON/OFF.
+        - If visual_net expects 1ch but inputs are 2ch, collapse back to grayscale.
+        """
+        if image_right is None:
+            image_right = image_left
+
+        if self._visual_in_ch == 2 and image_left.shape[1] == 1:
+            image_left  = self._to_on_off(image_left)
+            image_right = self._to_on_off(image_right)
+        elif self._visual_in_ch == 1 and image_left.shape[1] == 2:
+            image_left  = image_left.mean(dim=1, keepdim=True)
+            image_right = image_right.mean(dim=1, keepdim=True)
+        return image_left, image_right
+
+    @torch.no_grad()
+    def encode_image(self, image_left, image_right=None):
+        """
+        Vision-only embedding (NO whisker effects).
+        - Disables VISp inhibitory FiLM gate
+        - Skips VISrl spatial fusion
+        Returns: (B, embed_dim)
+        """
+        # Ensure shapes/channels are what visual_net expects
+        image_left, image_right = self._prep_visual_inputs(image_left, image_right)
+
+        # Temporarily disable whisker gating in VISp hook
+        prev_gate = self._gate_enabled
+        self._gate_enabled = False
+        self._current_z = None
+
+        # Get VISrl5 feature maps from left/right, WITHOUT fusion
+        fm_l = self.visual_net.get_img_feature(image_left,  ['VISrl5'], flatten=False)
+        fm_r = self.visual_net.get_img_feature(image_right, ['VISrl5'], flatten=False)
+
+        # Flatten + project with the existing FC head (it expects L and R concatenated)
+        B = image_left.size(0)
+        v_feat_left  = fm_l.view(B, -1)
+        v_feat_right = fm_r.view(B, -1)
+        v_embed = self.visual_fc(torch.cat([v_feat_left, v_feat_right], dim=1))
+
+        # restore state
+        self._gate_enabled = prev_gate
+        self._current_z = None
+        return v_embed
+
+    @torch.no_grad()
+    def encode_whisker(self, whisker):
+        """
+        Whisker-only embedding from the whisker encoder.
+        Input shape: (B, 60, 15, 4) as in your training pipeline
+        Returns: (B, 128)
+        """
+        return self.whisker_encoder(whisker)
+
+    @torch.no_grad()
+    def encode_fusion(self, image_left, image_right=None, whisker=None):
+        """
+        Fused vision+whisker embedding (uses the same path as forward):
+        - Applies VISp inhibitory FiLM (gated by whisker)
+        - Applies VISrl spatial fusion (whisker->VISrl)
+        Returns: (B, embed_dim)
+        """
+        assert whisker is not None, "encode_fusion requires a whisker tensor"
+        image_left, image_right = self._prep_visual_inputs(image_left, image_right)
+
+        # Whisker latent first so VISp hook can read it
+        w_embed = self.whisker_encoder(whisker)
+        self._current_z = w_embed
+
+        # Visual maps
+        fm_l = self.visual_net.get_img_feature(image_left,  ['VISrl5'], flatten=False)
+        fm_r = self.visual_net.get_img_feature(image_right, ['VISrl5'], flatten=False)
+
+        # Spatial fusion into VISrl
+        fm_l = self.visrl_fusion(fm_l, w_embed)
+        fm_r = self.visrl_fusion(fm_r, w_embed)
+
+        # Project to embedding
+        B = image_left.size(0)
+        v_feat_left  = fm_l.view(B, -1)
+        v_feat_right = fm_r.view(B, -1)
+        v_embed = self.visual_fc(torch.cat([v_feat_left, v_feat_right], dim=1))
+
+        self._current_z = None
+        return v_embed, w_embed
+    
     @property
     def temperature(self):
         return torch.clamp(self.log_temp.exp(), min=0.05, max=0.3)
-
     
 def clip_loss(vision_embed, whisker_embed, temperature):
     vision_embed = F.normalize(vision_embed, dim=1)
